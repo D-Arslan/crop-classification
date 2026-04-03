@@ -1,0 +1,21 @@
+# Données brutes (trop lourdes pour git)
+*.csv
+
+# Rapports Office et PDF
+*.docx
+*.pdf
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
