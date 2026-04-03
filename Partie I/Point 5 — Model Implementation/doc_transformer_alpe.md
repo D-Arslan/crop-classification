@@ -390,7 +390,8 @@ La fusion des deux sorties (CNN + Transformer) sera implémentée dans le bloc C
 ### Test de bon fonctionnement
 
 ```bash
-python transformer_alpe.py
+# depuis le dossier "Point 5 — Model Implementation"
+python -m tests.test_transformer
 ```
 
 Doit afficher :

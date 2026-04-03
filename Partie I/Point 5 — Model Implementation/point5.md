@@ -6,7 +6,8 @@
 Implémenter MCTNet en PyTorch, entraîner sur Arkansas et Californie, et reproduire les résultats de la Table 5 de l'article (OA=0.968 / Kappa=0.951 / F1=0.933 pour Arkansas).
 
 ## Fichiers produits
-- `transformer_alpe.py` — ALPE + Transformer sub-module ✅
+- `src/transformer_alpe.py` — ALPE + Transformer sub-module ✅
+- `tests/test_transformer.py` — tests des 3 stages + cas limites ✅
 - `cnn_submodule.py` — CNN sub-module *(Tesnime, à venir)*
 - `mctnet.py` — assemblage complet MCTNet *(à venir)*
 - `train.py` — boucle d'entraînement + évaluation *(à venir)*
