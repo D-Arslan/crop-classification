@@ -8,7 +8,8 @@ Implémenter MCTNet en PyTorch, entraîner sur Arkansas et Californie, et reprod
 ## Fichiers produits
 - `src/transformer_alpe.py` — ALPE + Transformer sub-module ✅
 - `tests/test_transformer.py` — tests des 3 stages + cas limites ✅
-- `cnn_submodule.py` — CNN sub-module *(Tesnime, à venir)*
+- `cnn_submodule.py` — CNN sub-module ✅
+- `tests/test_cnn.py` — tests des 3 stages + connexion résiduelle ✅
 - `mctnet.py` — assemblage complet MCTNet *(à venir)*
 - `train.py` — boucle d'entraînement + évaluation *(à venir)*
 
@@ -64,7 +65,7 @@ MLP Classifier    → (B, N_classes)
 
 ---
 
-## 5a. ALPE + Transformer sub-module ← [Moi]
+## 5a. ALPE + Transformer sub-module ← Arslan
 
 **Statut : ⏳ Implémentation de base terminée — intégration CTFusion à faire**
 
@@ -92,14 +93,6 @@ MLP Classifier    → (B, N_classes)
 - FFN dim cachée = 4×C (convention standard, non précisée dans l'article)
 - Entrée/sortie : `(B, C, T)`
 
-### Décisions d'implémentation
-| Décision | Raison |
-|----------|--------|
-| `batch_first=True` dans MultiheadAttention | Cohérence avec le format `(B, C, T)` |
-| FFN dim cachée = 4×C | Convention Transformer standard |
-| BN après Conv1D dans ALPE | Stabilité d'entraînement |
-| Addition résiduelle dans ALPE | L'article formule ALPE comme un ajout à x |
-
 ### Tests validés
 | Stage | Input | Mask | Output |
 |-------|-------|------|--------|
@@ -110,28 +103,48 @@ MLP Classifier    → (B, N_classes)
 Nombre total de paramètres (3 Transformers) : **26 433**
 
 ### Reste à faire
-- 🔲 Intégration dans le bloc CTFusion (avec le CNN du coéquipier A)
+- 🔲 Intégration dans le bloc CTFusion (avec le CNN sub-module)
 - 🔲 Implémentation de `mctnet.py` (assemblage complet)
 - 🔲 Tests sur données réelles (Arkansas_10k.csv / California_10k.csv)
 
-### Historique des modifications
-| Version | Modification |
-|---------|-------------|
-| v1 | Implémentation initiale |
-| v2 | PE sinusoïdal déplacé de `forward()` vers `__init__()` via `register_buffer` — évite le recalcul à chaque passage |
-
 ---
 
-## 5b. CNN sub-module ← Coéquipier A
+## 5b. CNN sub-module ← Tesnime
 
-**Statut : ⏳ En cours**
+**Statut : ✅ Implémentation terminée — intégration CTFusion à faire**
 
-### Architecture attendue
-- 2 couches Conv1D sur la dimension temporelle
-- BatchNorm après chaque couche
-- ReLU après les 2 couches
-- Connexion résiduelle : output = input + conv(input)
-- Entrée/sortie : `(B, C, T)`
+### Fichier : `cnn_submodule.py`
+
+### Module implémenté
+
+#### `CNNSubModule(in_channels, kernel_size=3)` — ResBlock 1D
+- Architecture : Conv1D → BN → Conv1D → BN → ReLU(out + résidu)
+- Connexion résiduelle directe (pas de projection — C inchangé)
+- Entrée/sortie : `(B, C, T)` — forme strictement conservée
+
+### Décisions d'implémentation
+| Décision | Raison |
+|----------|--------|
+| `bias=False` dans Conv1D | Inutile car BatchNorm normalise de toute façon |
+| BN après chaque Conv | Stabilité d'entraînement (schéma ResNet classique) |
+| Connexion résiduelle directe | `in_channels == out_channels` → pas besoin de projection |
+| ReLU après addition résiduelle | Schéma `conv → bn → conv → bn → relu(+résidu)` standard |
+
+### Tests validés
+| Stage | Input | Output |
+|-------|-------|--------|
+| 1 | `(B, 10, 36)` | `(B, 10, 36)` |
+| 2 | `(B, 20, 18)` | `(B, 20, 18)` |
+| 3 | `(B, 40,  9)` | `(B, 40,  9)` |
+| Connexion résiduelle | gradient non nul sur x | ✅ |
+| Dimension C inchangée | C identique entrée/sortie | ✅ |
+
+Nombre total de paramètres (3 CNN sub-modules) : **12 880**
+
+### Reste à faire
+- 🔲 Intégration dans le bloc CTFusion (avec le Transformer sub-module d'Arslan)
+- 🔲 Implémentation de `mctnet.py` (assemblage complet)
+- 🔲 Tests sur données réelles (Arkansas / California)
 
 ---
 
