@@ -73,7 +73,10 @@ git push origin arslan/transformer
 
 - [ ] Sarah — finaliser le preprocessing, compléter `Partie I/Point 4 — Data Preprocessing/point4.md`
 - [ ] Tesnime — terminer le CNN sub-module
-- [ ] Arslan — implémenter CTFusion une fois le CNN disponible
+- [x] Arslan — CTFusion implémenté et testé ✅
+- [ ] Tesnime — confirmer que le CNN est final, ouvrir PR tesnime/cnn -> dev
+- [ ] Arslan — implémenter mctnet.py (assemblage complet)
+- [ ] Arslan — implémenter train.py (boucle entraînement + métriques)
 - [ ] Ensemble — assembler MCTNet complet, entraîner, évaluer
 
 ---
