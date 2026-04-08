@@ -7,10 +7,15 @@ Implémenter MCTNet en PyTorch, entraîner sur Arkansas et Californie, et reprod
 
 ## Fichiers produits
 - `src/transformer_alpe.py` — ALPE + Transformer sub-module ✅
+- `src/cnn_submodule.py` — CNN sub-module (Tesnime) ✅
+- `src/ctfusion.py` — bloc CTFusion (CNN + Transformer + MaxPool) ✅
 - `tests/test_transformer.py` — tests des 3 stages + cas limites ✅
-- `cnn_submodule.py` — CNN sub-module *(Tesnime, à venir)*
-- `mctnet.py` — assemblage complet MCTNet *(à venir)*
-- `train.py` — boucle d'entraînement + évaluation *(à venir)*
+- `tests/test_ctfusion.py` — tests pipeline 3 stages ✅
+- `doc_ctfusion.md` — documentation complète CTFusion ✅
+- `src/mctnet.py` — assemblage complet MCTNet ✅
+- `tests/test_mctnet.py` — pipeline complet + sanity check paramètres ✅
+- `doc_mctnet.md` — documentation complète MCTNet ✅
+- `train.py` — boucle d'entraînement complète + métriques OA/Kappa/F1 ✅
 
 ---
 
@@ -110,7 +115,6 @@ MLP Classifier    → (B, N_classes)
 Nombre total de paramètres (3 Transformers) : **26 433**
 
 ### Reste à faire
-- 🔲 Intégration dans le bloc CTFusion (avec le CNN du coéquipier A)
 - 🔲 Implémentation de `mctnet.py` (assemblage complet)
 - 🔲 Tests sur données réelles (Arkansas_10k.csv / California_10k.csv)
 
@@ -118,7 +122,7 @@ Nombre total de paramètres (3 Transformers) : **26 433**
 | Version | Modification |
 |---------|-------------|
 | v1 | Implémentation initiale |
-| v2 | PE sinusoïdal déplacé de `forward()` vers `__init__()` via `register_buffer` — évite le recalcul à chaque passage |
+| v2 | PE sinusoïdal déplacé de `forward()` vers `__init__()` via `register_buffer` |
 
 ---
 

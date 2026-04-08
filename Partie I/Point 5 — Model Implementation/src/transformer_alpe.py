@@ -216,8 +216,11 @@ class TransformerSubModule(nn.Module):
         self.norm1 = nn.LayerNorm(channels)
 
         # Feed Forward Network (FFN)
-        # L'article ne précise pas la dim cachée ; convention Transformer : 4 × d_model
-        ffn_dim = 4 * channels
+        # L'article ne précise pas la dim cachée explicitement.
+        # ffn_dim = 8×C donne 56 798 params (Arkansas), le plus proche de la
+        # cible article de 55 059 (Table 6). Ecart résiduel ~1 739 params,
+        # probablement dû à de légères différences dans l'ALPE ou les BN.
+        ffn_dim = 8 * channels
         self.ffn = nn.Sequential(
             nn.Linear(channels, ffn_dim),
             nn.ReLU(),

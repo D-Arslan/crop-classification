@@ -1,5 +1,7 @@
-# Données brutes (trop lourdes pour git)
+# Données (trop lourdes pour git)
 *.csv
+*.npy
+data/
 
 # Rapports Office et PDF
 *.docx
@@ -8,6 +10,7 @@
 # Python
 __pycache__/
 *.py[cod]
+*.pth
 *.egg-info/
 .venv/
 venv/
