@@ -76,8 +76,10 @@ git push origin arslan/transformer
 - [x] Arslan — CTFusion implémenté et testé ✅
 - [x] Arslan — MCTNet assemblé et testé (56 798 params, cible article 55 059) ✅
 - [ ] Tesnime — confirmer que le CNN est final, ouvrir PR tesnime/cnn -> dev
-- [ ] Arslan — implémenter train.py (boucle entraînement + métriques)
-- [ ] Ensemble — entraîner sur Arkansas + Californie, évaluer OA/Kappa/F1
+- [x] Arslan — train.py implémenté et testé ✅
+- [ ] Résoudre anomalie données Arkansas (attente réponse Sarah)
+- [ ] Lancer entraînement complet Arkansas + Californie (200 époques)
+- [ ] Comparer OA/Kappa/F1 avec Table 5 de l'article
 
 ---
 

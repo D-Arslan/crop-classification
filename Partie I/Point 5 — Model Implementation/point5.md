@@ -15,7 +15,7 @@ Implémenter MCTNet en PyTorch, entraîner sur Arkansas et Californie, et reprod
 - `src/mctnet.py` — assemblage complet MCTNet ✅
 - `tests/test_mctnet.py` — pipeline complet + sanity check paramètres ✅
 - `doc_mctnet.md` — documentation complète MCTNet ✅
-- `train.py` — boucle d'entraînement + évaluation *(à venir)*
+- `train.py` — boucle d'entraînement complète + métriques OA/Kappa/F1 ✅
 
 ---
 
