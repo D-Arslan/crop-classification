@@ -12,7 +12,9 @@ Implémenter MCTNet en PyTorch, entraîner sur Arkansas et Californie, et reprod
 - `tests/test_transformer.py` — tests des 3 stages + cas limites ✅
 - `tests/test_ctfusion.py` — tests pipeline 3 stages ✅
 - `doc_ctfusion.md` — documentation complète CTFusion ✅
-- `src/mctnet.py` — assemblage complet MCTNet *(à venir)*
+- `src/mctnet.py` — assemblage complet MCTNet ✅
+- `tests/test_mctnet.py` — pipeline complet + sanity check paramètres ✅
+- `doc_mctnet.md` — documentation complète MCTNet ✅
 - `train.py` — boucle d'entraînement + évaluation *(à venir)*
 
 ---
