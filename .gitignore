@@ -22,3 +22,9 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Claude Code (mémoire locale, pas à versionner)
+.claude/
+
+# VS Code
+.vs/

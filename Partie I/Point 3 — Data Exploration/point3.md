@@ -38,10 +38,12 @@ mean_ndvi = np.nanmean(ndvi[mask], axis=0)  # nanmean ignore les NaN
 ### Résultats Arkansas
 | Métrique | Valeur |
 |----------|--------|
-| Taux de zéros global | 23.9% |
+| Taux de zéros global (version finale) | 22.71% |
 | Timesteps 100% manquants | 3 (t3, t15, t34) |
-| Max spectral | 12 998 |
-| Moyenne spectrale | 1 612 |
+| Max spectral brut | 12 986 |
+| Pixels sans aucun manquant | 0 (0.0%) |
+
+> **Note** : ces chiffres correspondent à la version finale Arkansas (10 000 pixels équilibrés, 2000/classe). L'ancienne version (12 500 pixels) affichait 23.9% de zéros.
 
 Décalage phénologique observé (cohérent avec l'article) :
 - Maïs : pic NDVI DOY ~170
@@ -103,3 +105,11 @@ mean_ndvi = np.nanmean(ndvi[mask], axis=0)
 - ← **Point 2** : explore les CSV produits par la collecte GEE
 - → **Point 4** : valide que les données sont exploitables ; confirme que les 0 sont des manquants à traiter
 - → **Point 5** : les 3 timesteps 100% manquants en Arkansas (t3, t15, t34) sont un cas limite à garder en tête lors des tests du modèle
+
+---
+
+## Note sur les deux scales
+
+L'exploration a été conduite sur la version initiale (scale 30m). Les conclusions restent valides pour les deux scales (30m et 20m) : même structure de données, mêmes bandes, mêmes timesteps. Les légères différences de valeurs entre scales sont normales (résolution spatiale différente → pixels différents).
+
+La version finale du dataset utilisé pour l'entraînement est décrite dans **Point 4**.

@@ -11,10 +11,12 @@ Collecter via Google Earth Engine les données Sentinel-2 pour Arkansas et Calif
 - `gee_california_fina4_extra.js` — script GEE pour les 3 zones supplémentaires (Z6-Z8)
 - `merge_and_subsample.py` — fusion des zones et sous-échantillonnage à 10 000
 - `rapport_collecte_donnees.docx` — rapport complet
-- `Arkansas_10k.csv` — données finales Arkansas
+- `Arkansas_10k.csv` — données brutes Arkansas (ancienne version — voir note ci-dessous)
 - `California_10k.csv` — données finales Californie
 - `Zones utilisées pour Arkansas/` — CSVs par zone avant fusion
 - `Zones utilisées pour Californie/` — CSVs par zone avant fusion
+
+> **Note — version finale Arkansas** : le fichier `Arkansas_10k.csv` ici est une version ancienne (12 500 pixels, déséquilibrée). La version finale utilisée pour le preprocessing est `arkansas_final.csv` livré par Sarah, produit depuis les zones Z1–Z5 avec correction des fichiers vides et équilibrage à 2000 pixels/classe. Voir Point 4 pour les détails.
 
 ---
 
@@ -113,7 +115,7 @@ La safetyImage étant masquée partout, elle ne contribue jamais à la médiane 
 ## Décisions prises & pourquoi
 | Décision | Raison |
 |----------|--------|
-| `scale=30` (résolution CDL) | L'article ne précise pas ; le CDL est à 30 m, c'est cohérent |
+| `scale=30` et `scale=20` | Deux résolutions testées pour comparaison expérimentale (voir Point 5) |
 | Valeurs 0 pour les manquants (pas NaN) | Convention explicite de l'article — utilisée par l'ALPE pour construire le masque |
 | Sous-échantillonnage aléatoire (pas stratifié) | `stratifiedSample` causait des timeouts GEE |
 

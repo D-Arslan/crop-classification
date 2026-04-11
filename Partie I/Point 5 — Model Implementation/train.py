@@ -4,12 +4,20 @@ Wang et al., 2024
 
 Usage :
     # depuis le dossier "Point 5 — Model Implementation"
-    python train.py --region Arkansas --data_dir ../../data/preprocessed
-    python train.py --region California --data_dir ../../data/preprocessed
+
+    # Scale 30m
+    python train.py --region Arkansas   --data_dir ../../data/preprocessed/scale30
+    python train.py --region California --data_dir ../../data/preprocessed/scale30
+
+    # Scale 20m
+    python train.py --region Arkansas   --data_dir ../../data/preprocessed/scale20
+    python train.py --region California --data_dir ../../data/preprocessed/scale20
 
 Sorties :
-    best_Arkansas.pth    — meilleur modèle Arkansas (selon F1 val)
-    best_California.pth  — meilleur modèle Californie
+    best_Arkansas_scale30.pth    — meilleur modèle Arkansas scale 30m (selon F1 val)
+    best_California_scale30.pth  — meilleur modèle Californie scale 30m
+    best_Arkansas_scale20.pth    — meilleur modèle Arkansas scale 20m
+    best_California_scale20.pth  — meilleur modèle Californie scale 20m
 """
 
 import argparse
@@ -153,12 +161,21 @@ def evaluate(model, loader, criterion, device):
 def main(region: str, data_dir: str):
     device     = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     n_classes  = N_CLASSES[region]
-    save_path  = f'best_{region}.pth'
+
+    # Déduire le nom de la scale depuis le chemin data_dir pour nommer le fichier sauvegardé
+    if 'scale20' in data_dir:
+        scale_tag = 'scale20'
+    elif 'scale30' in data_dir:
+        scale_tag = 'scale30'
+    else:
+        scale_tag = 'scale_unknown'
+    save_path  = f'best_{region}_{scale_tag}.pth'
 
     print('=' * 60)
-    print(f'MCTNet — {region}  ({n_classes} classes)')
+    print(f'MCTNet — {region}  ({n_classes} classes)  [{scale_tag}]')
     print(f'Device : {device}')
     print(f'Hyperparametres : {CONFIG}')
+    print(f'Data dir : {data_dir}')
     print('=' * 60)
 
     # --- Données ---
@@ -243,8 +260,8 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--data_dir',
-        default='../../data/preprocessed',
-        help='Chemin vers les fichiers .npy (defaut: ../../data/preprocessed)',
+        default='../../data/preprocessed/scale30',
+        help='Chemin vers les fichiers .npy (defaut: ../../data/preprocessed/scale30)',
     )
     args = parser.parse_args()
     main(args.region, args.data_dir)

@@ -22,8 +22,8 @@
 | 1 | Literature Review | Équipe | ✅ Terminé |
 | 2 | Dataset Acquisition | Équipe | ✅ Terminé |
 | 3 | Data Exploration | Équipe | ✅ Terminé |
-| 4 | Data Preprocessing | Sarah | ⏳ En cours |
-| 5 | Model Implementation | Arslan + Tesnime | ⏳ En cours |
+| 4 | Data Preprocessing | Sarah | ✅ Terminé |
+| 5 | Model Implementation | Arslan + Tesnime | ⏳ En cours (entraînement à lancer) |
 
 ---
 
@@ -71,14 +71,15 @@ git push origin arslan/transformer
 
 ## Prochaines étapes
 
-- [ ] Sarah — finaliser le preprocessing, compléter `Partie I/Point 4 — Data Preprocessing/point4.md`
-- [ ] Tesnime — terminer le CNN sub-module
+- [x] Sarah — preprocessing terminé, deux scales livrées (scale30 + scale20) ✅
+- [x] Sarah — dataset Arkansas corrigé et équilibré (10 000 pixels, 2000/classe) ✅
 - [x] Arslan — CTFusion implémenté et testé ✅
 - [x] Arslan — MCTNet assemblé et testé (56 798 params, cible article 55 059) ✅
-- [ ] Tesnime — confirmer que le CNN est final, ouvrir PR tesnime/cnn -> dev
 - [x] Arslan — train.py implémenté et testé ✅
-- [ ] Résoudre anomalie données Arkansas (attente réponse Sarah)
-- [ ] Lancer entraînement complet Arkansas + Californie (200 époques)
+- [x] Arslan — train.py mis à jour pour scale30/scale20 ✅
+- [ ] Tesnime — confirmer que le CNN est final, ouvrir PR tesnime/cnn -> dev
+- [ ] Tesnime — lancer l'entraînement sur sa machine (voir message ci-dessous)
+- [ ] Lancer entraînement complet Arkansas + Californie × 2 scales (200 époques chacun)
 - [ ] Comparer OA/Kappa/F1 avec Table 5 de l'article
 
 ---

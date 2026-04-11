@@ -57,28 +57,21 @@ Ils sont disponibles sur le Google Drive partagé de l'équipe.
 ```
 crop-classification/
 └── data/
-    ├── raw/
-    │   ├── Arkansas_10k.csv
-    │   └── California_10k.csv
     └── preprocessed/
-        ├── Arkansas_train_input1.npy
-        ├── Arkansas_train_input2.npy
-        ├── Arkansas_train_labels.npy
-        ├── Arkansas_val_input1.npy
-        ├── Arkansas_val_input2.npy
-        ├── Arkansas_val_labels.npy
-        ├── Arkansas_test_input1.npy
-        ├── Arkansas_test_input2.npy
-        ├── Arkansas_test_labels.npy
-        ├── California_train_input1.npy
-        ├── California_train_input2.npy
-        ├── California_train_labels.npy
-        ├── California_val_input1.npy
-        ├── California_val_input2.npy
-        ├── California_val_labels.npy
-        ├── California_test_input1.npy
-        ├── California_test_input2.npy
-        └── California_test_labels.npy
+        ├── scale30/           <- résolution 30m (version principale)
+        │   ├── Arkansas_train_input1.npy
+        │   ├── Arkansas_train_input2.npy
+        │   ├── Arkansas_train_labels.npy
+        │   ├── Arkansas_val_input1.npy
+        │   ├── Arkansas_val_input2.npy
+        │   ├── Arkansas_val_labels.npy
+        │   ├── Arkansas_test_input1.npy
+        │   ├── Arkansas_test_input2.npy
+        │   ├── Arkansas_test_labels.npy
+        │   ├── California_train_input1.npy
+        │   └── ... (même structure pour California)
+        └── scale20/           <- résolution 20m (comparaison)
+            └── ... (même structure)
 ```
 
 ### Régénérer les fichiers preprocessés (optionnel)
@@ -86,11 +79,12 @@ crop-classification/
 Si tu veux relancer le preprocessing depuis les CSV bruts :
 
 ```bash
-# Ouvrir et exécuter toutes les cellules du notebook
+# Scale 30m
+jupyter notebook "Partie I/Point 4 — Data Preprocessing/preprocessing_30.ipynb"
+
+# Scale 20m
 jupyter notebook "Partie I/Point 4 — Data Preprocessing/preprocessing_MCTNet_N_10_36_20.ipynb"
 ```
-
-Les fichiers `.npy` seront générés dans `Partie I/Point 4 — Data Preprocessing/preprocessed/`.
 
 ---
 
