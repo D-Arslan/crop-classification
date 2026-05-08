@@ -1,5 +1,6 @@
 """
 CTFusion — bloc CNN-Transformer Fusion
+GatedCTFusion — variante avec gate apprise (Partie 3)
 MCTNet — Wang et al., 2024
 
 Architecture de référence :
@@ -98,3 +99,106 @@ class CTFusion(nn.Module):
         out = self.pool(fused)                   # (B, 2C, T//2)
 
         return out
+
+
+class GatedCTFusion(nn.Module):
+    """
+    GatedCTFusion — variante de CTFusion avec fusion pondérée apprise.
+
+    Problème de CTFusion original : CNN et Transformer contribuent toujours
+    à 50/50 via la concaténation fixe. Or leur utilité relative varie selon
+    la culture (pics courts → CNN, tendances longues → Transformer) et le stage.
+
+    Solution : une gate apprend un vecteur α ∈ (0,1) par canal à partir du
+    contexte global (moyenne temporelle des deux sorties). α pondère la
+    contribution du CNN, (1-α) celle du Transformer.
+
+    Flux :
+      x ──→ CNN         ──→ cnn_out : (B, C, T)  ──┐
+      x ──→ Transformer ──→ tr_out  : (B, C, T)  ──┤
+                                                     ├── context (B, 2C)
+                                                     ├── gate_fc → α (B, C)
+      fused = cat([α·cnn_out, (1-α)·tr_out])  →  (B, 2C, T)
+      MaxPool1d(kernel=2, stride=2)            →  (B, 2C, T//2)
+
+    Forme de sortie identique à CTFusion — compatible avec MCTNet sans
+    aucune modification du reste du code.
+
+    Params supplémentaires par rapport à CTFusion :
+      gate_fc : Linear(2C, C)  →  2C² + C params par stage
+      Stage 1 (C=10) :  210 params
+      Stage 2 (C=20) :  820 params
+      Stage 3 (C=40) : 3 240 params
+      Total           : ~4 270 params supplémentaires
+
+    Args:
+        in_channels  : C — canaux en entrée
+        seq_len      : T — timesteps en entrée
+        n_head       : têtes d'attention (défaut=5)
+        kernel_size  : kernel Conv1D (défaut=3)
+        use_alpe     : True uniquement pour le Stage 1
+        dropout      : dropout Transformer (défaut=0.1)
+
+    Entrée  : (B, C, T)  +  mask (B, T) si use_alpe=True
+    Sortie  : (B, 2C, T//2)
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        seq_len: int,
+        n_head: int = 5,
+        kernel_size: int = 3,
+        use_alpe: bool = False,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+
+        self.cnn = CNNSubModule(
+            in_channels=in_channels,
+            kernel_size=kernel_size,
+        )
+
+        self.transformer = TransformerSubModule(
+            channels=in_channels,
+            seq_len=seq_len,
+            n_head=n_head,
+            use_alpe=use_alpe,
+            kernel_size=kernel_size,
+            dropout=dropout,
+        )
+
+        # Gate : contexte global (2C) → poids par canal (C)
+        # Entrée : moyenne temporelle de cat([cnn_out, tr_out]) → (B, 2C)
+        # Sortie : α ∈ (0,1)^C — un poids par canal CNN
+        self.gate_fc = nn.Linear(2 * in_channels, in_channels)
+
+        self.pool = nn.MaxPool1d(kernel_size=2, stride=2)
+
+    def forward(
+        self, x: torch.Tensor, mask: torch.Tensor | None = None
+    ) -> torch.Tensor:
+        """
+        Args:
+            x    : (B, C, T)
+            mask : (B, T)  — requis si use_alpe=True
+
+        Returns:
+            out  : (B, 2C, T//2)
+        """
+        cnn_out = self.cnn(x)               # (B, C, T)
+        tr_out  = self.transformer(x, mask) # (B, C, T)
+
+        # Contexte global : moyenne temporelle sur les deux sorties
+        context = torch.cat([cnn_out, tr_out], dim=1).mean(dim=2)  # (B, 2C)
+
+        # Gate : α par canal, appris depuis le contexte
+        alpha = torch.sigmoid(self.gate_fc(context))        # (B, C)
+        alpha = alpha.unsqueeze(-1)                         # (B, C, 1) — broadcast sur T
+
+        # Fusion pondérée : α·CNN + (1-α)·Transformer, concaténés
+        fused = torch.cat(
+            [alpha * cnn_out, (1 - alpha) * tr_out], dim=1 # (B, 2C, T)
+        )
+
+        return self.pool(fused)                             # (B, 2C, T//2)

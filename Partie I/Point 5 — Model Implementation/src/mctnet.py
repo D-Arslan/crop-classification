@@ -20,7 +20,7 @@ Flux complet :
 import torch
 import torch.nn as nn
 
-from src.ctfusion import CTFusion
+from src.ctfusion import CTFusion, GatedCTFusion
 
 
 class MCTNet(nn.Module):
@@ -111,3 +111,77 @@ class MCTNet(nn.Module):
         with torch.no_grad():
             logits = self.forward(x, mask)
             return logits.argmax(dim=1)
+
+
+class GatedMCTNet(nn.Module):
+    """
+    GatedMCTNet — MCTNet avec GatedCTFusion (Partie 3).
+
+    Seul changement par rapport à MCTNet : chaque bloc CTFusion est remplacé
+    par un GatedCTFusion qui apprend dynamiquement la contribution relative
+    du CNN et du Transformer à chaque stage.
+
+    Interface identique à MCTNet — mêmes entrées, mêmes sorties.
+    Paramètres supplémentaires : ~4 270 (gates des 3 stages).
+
+    Args:
+        n_classes   : nombre de classes (5 pour Arkansas, 6 pour Californie)
+        n_head      : têtes d'attention (défaut=5)
+        kernel_size : kernel Conv1D (défaut=3)
+        dropout     : dropout Transformer (défaut=0.1)
+
+    Entrée :
+        x    : (B, 10, 36)
+        mask : (B, 36)
+
+    Sortie :
+        logits : (B, N_classes)
+    """
+
+    def __init__(
+        self,
+        n_classes: int,
+        n_head: int = 5,
+        kernel_size: int = 3,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+
+        self.stage1 = GatedCTFusion(
+            in_channels=10, seq_len=36,
+            n_head=n_head, kernel_size=kernel_size,
+            use_alpe=True, dropout=dropout,
+        )
+        self.stage2 = GatedCTFusion(
+            in_channels=20, seq_len=18,
+            n_head=n_head, kernel_size=kernel_size,
+            use_alpe=False, dropout=dropout,
+        )
+        self.stage3 = GatedCTFusion(
+            in_channels=40, seq_len=9,
+            n_head=n_head, kernel_size=kernel_size,
+            use_alpe=False, dropout=dropout,
+        )
+
+        self.classifier = nn.Linear(80, n_classes)
+
+    def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            x    : (B, 10, 36)
+            mask : (B, 36)
+
+        Returns:
+            logits : (B, N_classes)
+        """
+        out = self.stage1(x, mask)   # (B, 20, 18)
+        out = self.stage2(out)       # (B, 40,  9)
+        out = self.stage3(out)       # (B, 80,  4)
+
+        out = out.max(dim=2).values  # Global Max Pooling → (B, 80)
+
+        return self.classifier(out)  # (B, N_classes)
+
+    def predict(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        with torch.no_grad():
+            return self.forward(x, mask).argmax(dim=1)

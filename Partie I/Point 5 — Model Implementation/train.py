@@ -1,23 +1,19 @@
 """
-train.py — Entraînement MCTNet
+train.py — Entraînement MCTNet / GatedMCTNet
 Wang et al., 2024
 
 Usage :
     # depuis le dossier "Point 5 — Model Implementation"
 
-    # Scale 30m
-    python train.py --region Arkansas   --data_dir ../../data/preprocessed/scale30
-    python train.py --region California --data_dir ../../data/preprocessed/scale30
+    python train.py --region Arkansas   --data_dir ../../data/preprocessed/partie1
+    python train.py --region California --data_dir ../../data/preprocessed/partie1
 
-    # Scale 20m
-    python train.py --region Arkansas   --data_dir ../../data/preprocessed/scale20
-    python train.py --region California --data_dir ../../data/preprocessed/scale20
+    # Partie 3 — GatedMCTNet
+    python train.py --region Arkansas   --data_dir ../../data/preprocessed/partie1 --model gated
+    python train.py --region California --data_dir ../../data/preprocessed/partie1 --model gated
 
 Sorties :
-    best_Arkansas_scale30.pth    — meilleur modèle Arkansas scale 30m (selon F1 val)
-    best_California_scale30.pth  — meilleur modèle Californie scale 30m
-    best_Arkansas_scale20.pth    — meilleur modèle Arkansas scale 20m
-    best_California_scale20.pth  — meilleur modèle Californie scale 20m
+    best_{region}_{model}.pth  — meilleur modèle selon F1 val
 """
 
 import argparse
@@ -30,7 +26,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import accuracy_score, cohen_kappa_score, f1_score
 
-from src.mctnet import MCTNet
+from src.mctnet import MCTNet, GatedMCTNet
 
 
 # ---------------------------------------------------------------------------
@@ -38,13 +34,15 @@ from src.mctnet import MCTNet
 # ---------------------------------------------------------------------------
 
 CONFIG = {
-    'lr':         0.001,
-    'batch_size': 32,
-    'epochs':     200,
-    'n_head':     5,
-    'kernel_size': 3,
-    'dropout':    0.1,
-    'print_every': 10,   # afficher un résumé toutes les N époques
+    'lr':           0.001,
+    'weight_decay': 1e-4,
+    'batch_size':   32,
+    'epochs':       200,
+    'n_head':       5,
+    'kernel_size':  3,
+    'dropout':      0.1,
+    'print_every':  10,
+    'patience':     20,   # early stopping
 }
 
 N_CLASSES = {
@@ -158,23 +156,14 @@ def evaluate(model, loader, criterion, device):
 # Main — boucle complète
 # ---------------------------------------------------------------------------
 
-def main(region: str, data_dir: str):
-    device     = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    n_classes  = N_CLASSES[region]
-
-    # Déduire le nom de la scale depuis le chemin data_dir pour nommer le fichier sauvegardé
-    if 'scale20' in data_dir:
-        scale_tag = 'scale20'
-    elif 'scale30' in data_dir:
-        scale_tag = 'scale30'
-    else:
-        scale_tag = 'scale_unknown'
-    save_path  = f'best_{region}_{scale_tag}.pth'
+def main(region: str, data_dir: str, model_name: str):
+    device    = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    n_classes = N_CLASSES[region]
+    save_path = f'best_{region}_{model_name}.pth'
 
     print('=' * 60)
-    print(f'MCTNet — {region}  ({n_classes} classes)  [{scale_tag}]')
+    print(f'{model_name.upper()} -- {region}  ({n_classes} classes)')
     print(f'Device : {device}')
-    print(f'Hyperparametres : {CONFIG}')
     print(f'Data dir : {data_dir}')
     print('=' * 60)
 
@@ -187,62 +176,74 @@ def main(region: str, data_dir: str):
     val_loader   = DataLoader(val_set,   batch_size=CONFIG['batch_size'], shuffle=False)
     test_loader  = DataLoader(test_set,  batch_size=CONFIG['batch_size'], shuffle=False)
 
-    print(f'\nDonnees : {len(train_set)} train | {len(val_set)} val | {len(test_set)} test')
+    print(f'Donnees : {len(train_set)} train | {len(val_set)} val | {len(test_set)} test')
 
     # --- Modèle ---
-    model = MCTNet(
+    model_cls = GatedMCTNet if model_name == 'gated' else MCTNet
+    model = model_cls(
         n_classes=n_classes,
         n_head=CONFIG['n_head'],
         kernel_size=CONFIG['kernel_size'],
         dropout=CONFIG['dropout'],
     ).to(device)
 
-    total_params = sum(p.numel() for p in model.parameters())
-    print(f'Parametres : {total_params:,}  (article Table 6 : 55 059)\n')
+    print(f'Parametres : {sum(p.numel() for p in model.parameters()):,}\n')
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG['lr'])
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=CONFIG['lr'], weight_decay=CONFIG['weight_decay']
+    )
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=10
+    )
 
     # --- Boucle d'entraînement ---
-    best_f1    = 0.0
-    best_epoch = 0
-    t0         = time.time()
+    best_f1        = 0.0
+    best_epoch     = 0
+    epochs_no_impr = 0
+    t0             = time.time()
 
     for epoch in range(1, CONFIG['epochs'] + 1):
         train_loss = train_one_epoch(model, train_loader, criterion, optimizer, device)
         val_loss, val_oa, val_kappa, val_f1 = evaluate(model, val_loader, criterion, device)
 
-        # Sauvegarde du meilleur modèle (selon F1 val)
-        if val_f1 > best_f1:
-            best_f1    = val_f1
-            best_epoch = epoch
-            torch.save(model.state_dict(), save_path)
+        scheduler.step(val_loss)
 
-        # Affichage toutes les N époques
+        if val_f1 > best_f1:
+            best_f1        = val_f1
+            best_epoch     = epoch
+            epochs_no_impr = 0
+            torch.save(model.state_dict(), save_path)
+        else:
+            epochs_no_impr += 1
+
         if epoch % CONFIG['print_every'] == 0 or epoch == 1:
             elapsed = time.time() - t0
             print(
-                f'Epoch {epoch:3d}/{CONFIG["epochs"]} '
-                f'| train_loss={train_loss:.4f} '
-                f'| val_loss={val_loss:.4f} '
-                f'| val_OA={val_oa:.4f} '
-                f'| val_Kappa={val_kappa:.4f} '
-                f'| val_F1={val_f1:.4f} '
-                f'| best_F1={best_f1:.4f} (ep{best_epoch}) '
+                f'Ep {epoch:3d}/{CONFIG["epochs"]} '
+                f'| train={train_loss:.4f} '
+                f'| val={val_loss:.4f} '
+                f'| OA={val_oa:.4f} '
+                f'| F1={val_f1:.4f} '
+                f'| best={best_f1:.4f}(ep{best_epoch}) '
                 f'| {elapsed:.0f}s'
             )
 
+        if epochs_no_impr >= CONFIG['patience']:
+            print(f'\nEarly stopping a l\'epoch {epoch} (best ep={best_epoch})')
+            break
+
     # --- Évaluation finale sur le test set ---
-    print(f'\nChargement du meilleur modele (epoch {best_epoch}, val_F1={best_f1:.4f})...')
+    print(f'\nChargement meilleur modele (epoch {best_epoch}, val_F1={best_f1:.4f})...')
     model.load_state_dict(torch.load(save_path, map_location=device))
     _, test_oa, test_kappa, test_f1 = evaluate(model, test_loader, criterion, device)
 
     print('\n' + '=' * 60)
-    print(f'RESULTATS FINAUX — {region}')
+    print(f'RESULTATS FINAUX -- {region} [{model_name}]')
     print('=' * 60)
-    print(f'  OA    : {test_oa:.4f}  (article : {"0.968" if region == "Arkansas" else "0.852"})')
-    print(f'  Kappa : {test_kappa:.4f}  (article : {"0.951" if region == "Arkansas" else "0.806"})')
-    print(f'  F1    : {test_f1:.4f}  (article : {"0.933" if region == "Arkansas" else "0.829"})')
+    print(f'  OA    : {test_oa:.4f}')
+    print(f'  Kappa : {test_kappa:.4f}')
+    print(f'  F1    : {test_f1:.4f}')
     print(f'\nModele sauvegarde : {save_path}')
 
 
@@ -251,17 +252,21 @@ def main(region: str, data_dir: str):
 # ---------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Entrainement MCTNet')
+    parser = argparse.ArgumentParser(description='Entrainement MCTNet / GatedMCTNet')
     parser.add_argument(
         '--region',
         choices=['Arkansas', 'California'],
         default='Arkansas',
-        help='Dataset a utiliser (defaut: Arkansas)',
     )
     parser.add_argument(
         '--data_dir',
-        default='../../data/preprocessed/scale30',
-        help='Chemin vers les fichiers .npy (defaut: ../../data/preprocessed/scale30)',
+        default='../../data/preprocessed/partie1',
+    )
+    parser.add_argument(
+        '--model',
+        choices=['mctnet', 'gated'],
+        default='gated',
+        help='mctnet = MCTNet original | gated = GatedMCTNet (Partie 3)',
     )
     args = parser.parse_args()
-    main(args.region, args.data_dir)
+    main(args.region, args.data_dir, args.model)
