@@ -1,0 +1,130 @@
+% ============================================================
+%  Partie 2 — Exploration des données
+% ============================================================
+
+\chapter{Partie 2 — Exploration des données}
+\label{chap:partie2}
+
+\section{Présentation}
+
+Cette partie porte sur l'analyse approfondie des données Sentinel-2 utilisées
+pour l'entraînement, afin de mieux comprendre leur structure, leur qualité
+et les défis qu'elles posent au modèle.
+
+\section{Description des données}
+
+\subsection{Bandes spectrales}
+
+Les 10 bandes Sentinel-2 retenues couvrent le spectre visible, le proche
+infrarouge et le moyen infrarouge :
+
+\begin{table}[H]
+\centering
+\caption{Bandes Sentinel-2 utilisées}
+\label{tab:bandes}
+\begin{tabular}{llll}
+\toprule
+\textbf{Bande} & \textbf{Nom} & \textbf{Longueur d'onde} & \textbf{Résolution} \\
+\midrule
+B2  & Blue         & 490 nm  & 10 m \\
+B3  & Green        & 560 nm  & 10 m \\
+B4  & Red          & 665 nm  & 10 m \\
+B5  & Red Edge 1   & 705 nm  & 20 m \\
+B6  & Red Edge 2   & 740 nm  & 20 m \\
+B7  & Red Edge 3   & 783 nm  & 20 m \\
+B8  & NIR          & 842 nm  & 10 m \\
+B8A & NIR narrow   & 865 nm  & 20 m \\
+B11 & SWIR 1       & 1610 nm & 20 m \\
+B12 & SWIR 2       & 2190 nm & 20 m \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Dimension temporelle}
+
+Chaque saison agricole est représentée par 36 pas de temps (composites
+bi-mensuels sur 18 mois ou composites mensuels sur 3 ans), permettant de
+capturer l'intégralité du cycle phénologique des cultures.
+
+\section{Analyse des classes}
+
+\subsection{Classes de cultures}
+
+\begin{table}[H]
+\centering
+\caption{Classes de cultures par région}
+\label{tab:classes}
+\begin{tabular}{llll}
+\toprule
+\textbf{Arkansas} & \textbf{Indice} & \textbf{California} & \textbf{Indice} \\
+\midrule
+Corn       & 0 & Rice       & 0 \\
+Cotton     & 1 & Alfalfa    & 1 \\
+Rice       & 2 & Grapes     & 2 \\
+Soybeans   & 3 & Almonds    & 3 \\
+Others     & 4 & Pistachios & 4 \\
+           &   & Others     & 5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Distribution des classes}
+
+% \begin{figure}[H]
+%   \centering
+%   \includegraphics[width=0.85\textwidth]{figures/class_distribution.png}
+%   \caption{Distribution des classes dans le jeu d'entraînement.}
+%   \label{fig:class_dist}
+% \end{figure}
+
+[À compléter avec le graphique de distribution des classes]
+
+\section{Analyse des séries temporelles}
+
+\subsection{Profils phénologiques}
+
+Chaque culture présente une signature temporelle caractéristique dans les
+bandes spectrales. Le Rice en Arkansas montre un pic de réflectance NIR
+concentré sur les mois de juillet-août, correspondant à son cycle de
+croissance. Les cultures pérennes (Alfalfa, Grapes en Californie) présentent
+un signal élevé et stable sur toute la saison.
+
+% \begin{figure}[H]
+%   \centering
+%   \includegraphics[width=\textwidth]{figures/timeseries_par_classe.png}
+%   \caption{Séries temporelles moyennes par classe (bande NIR).}
+%   \label{fig:timeseries}
+% \end{figure}
+
+[À compléter avec les courbes de séries temporelles]
+
+\subsection{Données manquantes}
+
+La couverture nuageuse génère des valeurs manquantes dans les séries
+temporelles. Le masque \texttt{input2} encode la disponibilité de chaque
+observation : 1 si la mesure est fiable, 0 sinon.
+
+% \begin{figure}[H]
+%   \centering
+%   \includegraphics[width=0.8\textwidth]{figures/mask_analysis.png}
+%   \caption{Taux de données manquantes par pas de temps.}
+%   \label{fig:mask}
+% \end{figure}
+
+[À compléter avec l'analyse du masque]
+
+\section{Preprocessing}
+
+\subsection{Normalisation}
+
+Les réflectances sont normalisées par bande (mean/std) calculées
+exclusivement sur le train set. La même transformation est appliquée à val
+et test pour éviter toute fuite de données.
+
+\subsection{Stratégie d'échantillonnage}
+
+Les pixels d'entraînement sont extraits de zones géographiquement dispersées
+à travers la région d'étude. Cette approche évite l'autocorrélation spatiale
+entre train et test qui suresterait les performances réelles du modèle.
+
+\cleardoublepage

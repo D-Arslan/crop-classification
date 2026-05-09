@@ -1,0 +1,142 @@
+% ============================================================
+%  Chapitre 2 — Données
+% ============================================================
+
+\chapter{Données}
+\label{chap:donnees}
+
+\section{Régions d'étude}
+
+Deux régions agricoles des États-Unis ont été retenues, conformément au
+protocole de Wang et al. \cite{wang2024} :
+
+\begin{itemize}
+  \item \textbf{Arkansas} — région à dominante rizicole et cotonnière dans le
+        bassin du Mississippi. Cinq classes de cultures : Corn, Cotton, Rice,
+        Soybeans, Others.
+  \item \textbf{Californie} — région à horticulture intensive dans la Central
+        Valley. Six classes : Rice, Alfalfa, Grapes, Almonds, Pistachios,
+        Others.
+\end{itemize}
+
+Ces deux régions présentent des caractéristiques phénologiques contrastées,
+ce qui permet d'évaluer la généralisation du modèle.
+
+\section{Acquisition via Google Earth Engine}
+
+Les données Sentinel-2 ont été acquises via la plateforme
+\textbf{Google Earth Engine} (GEE), qui donne accès à l'archive complète des
+images satellitaires sans téléchargement local.
+
+Le pipeline d'acquisition comprend les étapes suivantes :
+\begin{enumerate}
+  \item Sélection de la collection \texttt{COPERNICUS/S2\_SR\_HARMONIZED}
+        (Surface Reflectance, harmonisée).
+  \item Filtrage par région d'intérêt (polygone délimitant l'État) et par
+        période (saison agricole 2022).
+  \item Masquage des nuages via la bande QA60 et le masque \texttt{SCL}.
+  \item Rééchantillonnage temporel en 36 composites mensuels ou bi-mensuels
+        par interpolation linéaire des valeurs manquantes.
+  \item Sélection des 10 bandes spectrales retenues : B2, B3, B4, B5, B6,
+        B7, B8, B8A, B11, B12.
+  \item Export en format GeoTIFF, puis conversion en tableaux NumPy.
+\end{enumerate}
+
+Les vérités terrain (labels) proviennent du programme
+\textbf{Cropland Data Layer} (CDL) de l'USDA, reclassifiées selon les
+catégories de l'article.
+
+\section{Zones d'échantillonnage}
+
+Les pixels ont été échantillonnés dans des \textbf{zones dispersées} sur
+l'ensemble de la région, afin d'éviter l'autocorrélation spatiale entre les
+ensembles d'entraînement et de test — un biais courant lorsque les zones
+d'entraînement et de test sont adjacentes. Cette stratégie s'écarte des
+zones concentrées initialement envisagées et améliore la robustesse de
+l'évaluation.
+
+La répartition des échantillons est la suivante :
+
+\begin{table}[H]
+\centering
+\caption{Répartition des échantillons par région et par split}
+\label{tab:splits}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Région} & \textbf{Train} & \textbf{Val} & \textbf{Test} \\
+\midrule
+Arkansas    & 1\,200 & 300 & 8\,523 \\
+California  & 1\,440 & 360 & 8\,226 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Le test set est volontairement large pour obtenir des métriques stables.
+
+\section{Format des données}
+
+Chaque pixel est représenté par :
+\begin{itemize}
+  \item \textbf{Input 1} (\texttt{input1.npy}) : tenseur de forme $(N, 10, 36)$,
+        type \texttt{float32} — valeurs de réflectance normalisées.
+  \item \textbf{Input 2} (\texttt{input2.npy}) : tenseur de forme $(N, 36)$,
+        type \texttt{float32} — masque binaire des observations manquantes
+        (1 = observation valide, 0 = nuage ou donnée absente).
+  \item \textbf{Labels} (\texttt{labels.npy}) : vecteur de forme $(N,)$,
+        type \texttt{int64} — indice de classe (0-indexé).
+\end{itemize}
+
+\section{Exploration statistique}
+
+\subsection{Distribution des classes}
+
+La distribution des classes dans le jeu d'entraînement reflète la
+prédominance de certaines cultures dans chaque région. En Arkansas, la
+classe Soybeans représente la majorité des pixels, tandis qu'en Californie,
+Alfalfa et Grapes dominent.
+
+% \begin{figure}[H]
+%   \centering
+%   \includegraphics[width=0.8\textwidth]{figures/class_distribution.png}
+%   \caption{Distribution des classes dans le jeu d'entraînement.}
+%   \label{fig:class_dist}
+% \end{figure}
+
+\subsection{Séries temporelles spectrales}
+
+Les séries temporelles moyennes par classe montrent des profils phénologiques
+distincts. Les cultures à cycle court (Rice en Arkansas) présentent un pic de
+NDVI net entre les mois de juin et août, tandis que les cultures pérennes
+(Alfalfa en Californie) affichent un signal élevé sur toute la saison.
+
+\subsection{Données manquantes}
+
+Le masque \texttt{input2} indique les pas de temps affectés par la couverture
+nuageuse. En Arkansas, la couverture nuageuse estivale génère des lacunes sur
+les mois de juillet-août. Le module ALPE (\textit{Adaptive Learnable
+Positional Encoding}) de MCTNet a été spécifiquement conçu pour traiter ces
+observations manquantes (cf. Section~\ref{sec:alpe}).
+
+\section{Preprocessing}
+
+\subsection{Normalisation}
+
+Les valeurs de réflectance sont normalisées par bande à l'échelle du jeu
+d'entraînement (mean/std). Cette normalisation est calculée uniquement sur
+le train set et appliquée à val et test pour éviter la fuite de données.
+
+\subsection{Gestion des valeurs manquantes}
+
+Les positions masquées (masque = 0) conservent leur valeur d'interpolation
+dans \texttt{input1}, mais le masque est explicitement fourni en entrée au
+modèle (\texttt{input2}). Le Transformer intègre ce masque via ALPE pour
+moduler la pondération de l'encodage positionnel selon la fiabilité de
+l'observation.
+
+\subsection{Découpage train/val/test}
+
+Le découpage est effectué au niveau spatial avant l'échantillonnage des
+pixels, de sorte qu'aucune zone géographique ne soit présente dans plusieurs
+splits. La graine aléatoire est fixée à 42 pour la reproductibilité.
+
+\cleardoublepage

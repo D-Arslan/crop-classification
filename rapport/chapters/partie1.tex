@@ -1,0 +1,168 @@
+% ============================================================
+%  Partie 1 — Modèle de base : MCTNet
+% ============================================================
+
+\chapter{Partie 1 — Reproduction de MCTNet}
+\label{chap:partie1}
+
+\section{Présentation de MCTNet}
+
+MCTNet (\textit{Multi-stage CNN-Transformer Network}) \cite{wang2024} est une
+architecture légère combinant CNN et Transformer pour la classification
+pixel par pixel de cultures agricoles. Avec moins de 57 000 paramètres, il
+atteint des performances comparables aux modèles bien plus lourds.
+
+\section{Architecture}
+
+\subsection{Vue d'ensemble}
+
+MCTNet enchaîne trois blocs CTFusion suivis d'un Global Max Pooling et d'un
+classificateur linéaire :
+
+\begin{equation}
+  (B,\,10,\,36)
+  \xrightarrow{\text{Stage 1}} (B,\,20,\,18)
+  \xrightarrow{\text{Stage 2}} (B,\,40,\,9)
+  \xrightarrow{\text{Stage 3}} (B,\,80,\,4)
+  \xrightarrow{\text{GMP}} (B,\,80)
+  \xrightarrow{\text{Linear}} (B,\,N_c)
+\end{equation}
+
+Chaque pixel est décrit par 10 bandes spectrales Sentinel-2 sur 36 pas de
+temps. $N_c = 5$ pour l'Arkansas, $N_c = 6$ pour la Californie.
+
+\subsection{Bloc CTFusion}
+
+Le bloc CTFusion est l'unité de base répétée trois fois. Il traite la même
+entrée en deux branches parallèles puis fusionne leurs sorties :
+
+\begin{itemize}
+  \item \textbf{Branche CNN} (ResBlock1D) — capte les motifs locaux de la
+        série temporelle (pics phénologiques, transitions).
+  \item \textbf{Branche Transformer} (MHSA, 5 têtes) — modélise les
+        dépendances globales entre pas de temps.
+\end{itemize}
+
+Les sorties sont concaténées sur la dimension canaux, puis réduites
+temporellement par un MaxPool1D (stride 2) :
+
+\begin{equation}
+  \text{CTFusion}(x) =
+  \text{MaxPool1D}\!\Big(\big[\,\text{CNN}(x),\;\text{Transformer}(x)\,\big]\Big)
+  \;:\; (B,C,T) \to (B,\,2C,\,T/2)
+\end{equation}
+
+\subsection{ALPE — gestion des données manquantes}
+
+Au Stage 1 uniquement, un module ALPE (\textit{Adaptive Learnable Positional
+Encoding}) pondère l'encodage positionnel du Transformer en fonction du masque
+de disponibilité (\texttt{input2}). Les pas de temps couverts par des nuages
+reçoivent un encodage réduit, limitant leur influence sur l'attention.
+
+\subsection{Bilan paramétrique}
+
+\begin{table}[H]
+\centering
+\caption{Nombre de paramètres de MCTNet}
+\label{tab:params_mctnet}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Composant} & \textbf{Arkansas ($N_c=5$)} & \textbf{California ($N_c=6$)} \\
+\midrule
+CTFusion Stage 1–3   & \multicolumn{2}{c}{56\,393 (partagé)} \\
+Classifier           & 405   & 486 \\
+\midrule
+\textbf{Total}       & \textbf{56\,798} & \textbf{56\,879} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Données}
+
+\subsection{Acquisition et format}
+
+Les données Sentinel-2 ont été acquises via Google Earth Engine sur deux
+régions agricoles américaines. Chaque pixel est représenté par :
+\begin{itemize}
+  \item \texttt{input1} : $(N,\,10,\,36)$ — réflectances spectrales normalisées
+  \item \texttt{input2} : $(N,\,36)$ — masque de disponibilité (1 = valide)
+  \item \texttt{labels} : $(N,)$ — indice de classe
+\end{itemize}
+
+Les labels proviennent du Cropland Data Layer (CDL) de l'USDA.
+
+\subsection{Répartition des échantillons}
+
+\begin{table}[H]
+\centering
+\caption{Répartition train / val / test}
+\label{tab:splits}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Région} & \textbf{Train} & \textbf{Val} & \textbf{Test} \\
+\midrule
+Arkansas   & 1\,200 & 300 & 8\,523 \\
+California & 1\,440 & 360 & 8\,226 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Les pixels sont échantillonnés dans des \textbf{zones dispersées} à travers
+la région, afin d'éviter l'autocorrélation spatiale entre les splits.
+
+\section{Protocole d'entraînement}
+
+\begin{table}[H]
+\centering
+\caption{Hyperparamètres (Table 3 de \cite{wang2024})}
+\label{tab:hyperparams}
+\begin{tabular}{ll}
+\toprule
+\textbf{Paramètre}   & \textbf{Valeur} \\
+\midrule
+Optimiseur           & Adam \\
+Taux d'apprentissage & $10^{-3}$ \\
+Weight decay         & $10^{-4}$ \\
+Batch size           & 32 \\
+Époques max          & 200 \\
+Têtes d'attention    & 5 \\
+Kernel Conv1D        & 3 \\
+Dropout              & 0.1 \\
+Early stopping       & patience = 20 \\
+Scheduler            & ReduceLROnPlateau (factor=0.5) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Le meilleur modèle est sélectionné selon le \textbf{F1 macro} sur le jeu de
+validation. Les métriques finales (OA, Kappa, F1) sont calculées sur le
+test set avec le meilleur checkpoint.
+
+\section{Résultats}
+
+\begin{table}[H]
+\centering
+\caption{MCTNet — métriques sur le test set}
+\label{tab:resultats_mctnet}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Région} & \textbf{OA} & \textbf{Kappa} & \textbf{F1 macro} \\
+\midrule
+Arkansas    & [résultat] & [résultat] & [résultat] \\
+California  & [résultat] & [résultat] & [résultat] \\
+\midrule
+\multicolumn{4}{l}{\textit{Référence \cite{wang2024}}} \\
+Arkansas    & 0.9598 & 0.9421 & --- \\
+California  & 0.9502 & 0.9313 & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% \begin{figure}[H]
+%   \centering
+%   \includegraphics[width=\textwidth]{figures/courbes_mctnet.png}
+%   \caption{Courbes d'apprentissage MCTNet — Arkansas et California.}
+%   \label{fig:courbes_mctnet}
+% \end{figure}
+
+\cleardoublepage

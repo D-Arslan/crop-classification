@@ -1,0 +1,162 @@
+% ============================================================
+%  Chapitre 1 — État de l'art
+% ============================================================
+
+\chapter{État de l'art}
+\label{chap:etat_art}
+
+\section{Notions fondamentales}
+
+\subsection{Intelligence Artificielle}
+
+L'Intelligence Artificielle (IA) désigne l'ensemble des techniques permettant
+à une machine de simuler des capacités cognitives humaines telles que la
+perception, le raisonnement et l'apprentissage. Dans le domaine du traitement
+de l'information, l'IA regroupe des sous-disciplines allant de la logique
+symbolique aux systèmes d'apprentissage automatique.
+
+\subsection{Machine Learning}
+
+Le Machine Learning (ML) est une branche de l'IA dans laquelle un système
+apprend à partir de données, sans être explicitement programmé pour chaque
+tâche. Plutôt que de définir des règles manuellement, un algorithme de ML
+ajuste ses paramètres internes en minimisant une fonction de coût sur un
+ensemble de données étiquetées.
+
+Les principales familles d'algorithmes de ML comprennent :
+\begin{itemize}
+  \item les méthodes basées sur les arbres de décision (Random Forest,
+        Gradient Boosting) ;
+  \item les machines à vecteurs de support (SVM) ;
+  \item les réseaux de neurones artificiels.
+\end{itemize}
+
+\subsection{Deep Learning}
+
+Le Deep Learning (DL) est un sous-domaine du ML qui utilise des réseaux de
+neurones profonds — c'est-à-dire composés de nombreuses couches — pour
+apprendre des représentations hiérarchiques à partir des données. Chaque
+couche transforme la représentation de la couche précédente pour extraire des
+caractéristiques de plus en plus abstraites.
+
+Le DL a démontré des performances remarquables sur des tâches de vision par
+ordinateur, de traitement du langage naturel et de traitement de séries
+temporelles, devenant la méthode de référence pour de nombreuses applications.
+
+\subsection{Réseau de Neurones Convolutionnel (CNN)}
+
+Un Réseau de Neurones Convolutionnel (CNN) est une architecture de DL
+spécialisée dans le traitement des données structurées spatialement (images,
+séries temporelles). Il repose sur l'opération de convolution, qui applique
+un filtre glissant sur l'entrée pour détecter des motifs locaux.
+
+Dans le cadre des séries temporelles à une dimension, une convolution 1D
+de noyau de taille $k$ sur une séquence de longueur $T$ et de $C$ canaux
+produit une nouvelle séquence où chaque position intègre l'information de
+$k$ pas de temps voisins :
+
+\begin{equation}
+  y[t] = \sum_{i=0}^{k-1} w[i] \cdot x[t+i]
+  \label{eq:conv1d}
+\end{equation}
+
+Les CNN capturent efficacement les motifs locaux — pic de NDVI, dates de
+semis — mais leur champ réceptif est limité à la taille du noyau.
+
+\subsection{Transformer}
+
+Le Transformer est une architecture introduite par Vaswani et al. \cite{vaswani2017}
+fondée sur le mécanisme d'attention. Contrairement aux CNN, le Transformer
+capture directement les dépendances à longue portée entre tous les éléments
+d'une séquence, indépendamment de leur distance.
+
+Le cœur du Transformer est le mécanisme de \textbf{Multi-Head Self-Attention}
+(MHSA), qui calcule pour chaque position un vecteur de contexte pondéré par
+l'attention portée à toutes les autres positions :
+
+\begin{equation}
+  \text{Attention}(Q, K, V) = \text{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right) V
+  \label{eq:attention}
+\end{equation}
+
+où $Q$, $K$, $V$ sont les matrices de requêtes, clés et valeurs, et $d_k$
+est la dimension des clés.
+
+L'encodage positionnel est nécessaire pour injecter l'ordre de la séquence,
+le MHSA étant invariant à la permutation.
+
+\subsection{Imagerie satellitaire Sentinel-2}
+
+Sentinel-2 est une constellation de deux satellites (2A et 2B) développée
+par l'ESA dans le cadre du programme Copernicus. Elle acquiert des images
+multispectrales avec 13 bandes, dont 10 à une résolution spatiale de 10 m
+ou 20 m. La période de revisite est de 5 jours à l'équateur.
+
+Pour ce projet, 10 bandes spectrales sont utilisées sur une saison agricole
+échantillonnée en 36 pas de temps, soit un tenseur de forme $(N, 10, 36)$
+par région d'étude.
+
+\section{Méthodes de classification de cultures}
+
+La classification de cultures par télédétection a évolué des méthodes
+traditionnelles vers les approches de DL au cours de la dernière décennie.
+
+\subsection{Méthodes classiques}
+
+Les méthodes classiques — Random Forest \cite{breiman2001}, SVM — traitent
+chaque pixel indépendamment à partir de statistiques de la série temporelle
+(moyenne, variance, indices végétatifs). Elles sont interprétables mais
+requièrent une ingénierie des caractéristiques manuelle et échouent à
+modéliser les dynamiques temporelles fines.
+
+\subsection{Approches récurrentes (RNN/LSTM)}
+
+Les réseaux récurrents (LSTM, GRU) ont été les premiers à exploiter
+directement la dimension temporelle des séries Sentinel-2 \cite{russwurm2018}.
+Cependant, ils souffrent de la disparition du gradient sur de longues
+séquences et de leur complexité en entraînement.
+
+\subsection{Approches CNN temporels}
+
+Des architectures CNN purement temporelles (TempCNN \cite{pelletier2019})
+modélisent la phénologie des cultures via des convolutions 1D. Elles sont
+plus légères que les RNN mais leur champ réceptif reste local.
+
+\subsection{Approches Transformer}
+
+Le succès des Transformers en NLP a motivé leur adaptation aux séries
+temporelles satellitaires. PSE+TAE \cite{garnot2021} et LTAE introduisent
+des mécanismes d'attention sur la dimension temporelle. Ces modèles
+capturent bien les tendances globales mais sont coûteux en paramètres.
+
+\subsection{Approches hybrides CNN-Transformer}
+
+Des architectures hybrides combinent la capacité des CNN à extraire des
+motifs locaux et celle des Transformers à modéliser les dépendances globales.
+MCTNet \cite{wang2024} appartient à cette catégorie : ses blocs CTFusion
+traitent la série temporelle en parallèle par un CNN et un Transformer, puis
+fusionnent leurs sorties par concaténation.
+
+\section{Tableau comparatif des approches}
+
+\begin{table}[H]
+\centering
+\caption{Comparaison des principales approches de classification de cultures}
+\label{tab:comparaison_approches}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Méthode} & \textbf{Temporel} & \textbf{Global} & \textbf{Léger} & \textbf{OA (Arkan.)} \\
+\midrule
+Random Forest     & \textcolor{red}{Non}   & \textcolor{red}{Non}   & \textcolor{green!60!black}{Oui} & $\sim$87\%  \\
+LSTM              & \textcolor{green!60!black}{Oui}  & \textcolor{green!60!black}{Oui}  & \textcolor{red}{Non}   & $\sim$90\%  \\
+TempCNN           & \textcolor{green!60!black}{Oui}  & \textcolor{red}{Non}   & \textcolor{green!60!black}{Oui} & $\sim$92\%  \\
+PSE+TAE           & \textcolor{green!60!black}{Oui}  & \textcolor{green!60!black}{Oui}  & \textcolor{red}{Non}   & $\sim$93\%  \\
+\textbf{MCTNet}   & \textcolor{green!60!black}{Oui}  & \textcolor{green!60!black}{Oui}  & \textcolor{green!60!black}{Oui} & \textbf{95\%+} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+MCTNet se distingue par son compromis entre capacité de modélisation et
+efficacité paramétrique, avec environ 56 000 paramètres seulement.
+
+\cleardoublepage

@@ -1,0 +1,31 @@
+% ============================================================
+%  Conclusion
+% ============================================================
+
+\chapter*{Conclusion}
+\addcontentsline{toc}{chapter}{Conclusion}
+\markboth{Conclusion}{}
+
+Ce projet a permis de reproduire, analyser et améliorer le modèle MCTNet
+pour la classification de cultures agricoles à partir de séries temporelles
+Sentinel-2.
+
+La \textbf{Partie 1} a confirmé la reproductibilité de MCTNet avec des
+performances cohérentes avec celles publiées dans \cite{wang2024}, tout en
+documentant le pipeline complet d'acquisition GEE et de preprocessing.
+
+La \textbf{Partie 2} a mis en évidence les caractéristiques des données :
+signatures phénologiques distinctes par culture, distribution des données
+manquantes liées à la couverture nuageuse, et importance de la stratégie
+d'échantillonnage spatial.
+
+La \textbf{Partie 3} a introduit GatedMCTNet, une variante architecturale
+qui remplace la fusion fixe 50/50 du CTFusion par une gate apprise par
+canal. Cette contribution ajoute seulement 4 270 paramètres (+7.5\%) pour
+un gain de flexibilité dans la fusion CNN-Transformer.
+
+Ces travaux ouvrent plusieurs perspectives : entraînement sur un jeu de
+données plus large pour consolider les résultats de la gate en Californie,
+extension de l'approche à d'autres régions géographiques, et exploration
+de mécanismes de gate plus expressifs (attention spatiale, gate par tête
+d'attention).

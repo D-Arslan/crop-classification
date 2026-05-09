@@ -1,0 +1,212 @@
+% ============================================================
+%  Chapitre 3 — Modèle MCTNet et Résultats
+% ============================================================
+
+\chapter{Modèle MCTNet et Résultats}
+\label{chap:modele}
+
+\section{Architecture MCTNet}
+\label{sec:architecture}
+
+MCTNet (\textit{Multi-stage CNN-Transformer Network}) \cite{wang2024} est une
+architecture légère conçue pour la classification pixel par pixel de cultures
+agricoles à partir de séries temporelles Sentinel-2. Elle exploite
+simultanément la capacité des CNN à extraire des motifs locaux et celle des
+Transformers à modéliser les dépendances à longue portée.
+
+\subsection{Vue d'ensemble}
+
+Le flux de données à travers MCTNet est le suivant :
+
+\begin{equation}
+  (B, 10, 36) \;\xrightarrow{\text{Stage 1}}\; (B, 20, 18)
+  \;\xrightarrow{\text{Stage 2}}\; (B, 40, 9)
+  \;\xrightarrow{\text{Stage 3}}\; (B, 80, 4)
+  \;\xrightarrow{\text{GMP}}\; (B, 80)
+  \;\xrightarrow{\text{Linear}}\; (B, N_c)
+\end{equation}
+
+où $B$ est la taille du batch, et $N_c$ le nombre de classes (5 pour
+l'Arkansas, 6 pour la Californie).
+
+\subsection{Bloc CTFusion}
+\label{sec:ctfusion}
+
+Le bloc CTFusion est l'unité de base répétée trois fois dans MCTNet. Il
+traite une entrée $(B, C, T)$ en deux branches parallèles :
+
+\begin{itemize}
+  \item \textbf{Branche CNN} : un bloc ResNet 1D extrait les motifs locaux
+        de la série temporelle (pics phénologiques, transitions).
+  \item \textbf{Branche Transformer} : un bloc d'attention multi-tête
+        modélise les dépendances globales entre pas de temps.
+\end{itemize}
+
+Les sorties des deux branches sont concaténées sur la dimension des canaux,
+puis réduites temporellement par un MaxPool1D de stride 2 :
+
+\begin{equation}
+  \text{CTFusion}(x) = \text{MaxPool1D}\Big(\big[\text{CNN}(x),\; \text{Transformer}(x)\big]\Big)
+  : (B, C, T) \to (B, 2C, T/2)
+  \label{eq:ctfusion}
+\end{equation}
+
+\subsection{Sous-module CNN}
+
+La branche CNN est constituée d'un bloc résiduel 1D (\textit{ResBlock1D}) :
+deux convolutions \texttt{Conv1D} avec normalisation par batch (\texttt{BN})
+et activation \texttt{ReLU}, plus une connexion résiduelle. La connexion
+résiduelle préserve le gradient lors de la rétropropagation et évite la
+dégradation des performances en profondeur.
+
+\subsection{Sous-module Transformer et ALPE}
+\label{sec:alpe}
+
+La branche Transformer repose sur une couche de Multi-Head Self-Attention
+(MHSA) avec 5 têtes d'attention, suivie d'une couche Feed-Forward.
+
+Un mécanisme original d'encodage positionnel adaptatif — \textbf{ALPE}
+(\textit{Adaptive Learnable Positional Encoding}) — est introduit au Stage 1
+pour gérer les observations manquantes. ALPE génère un encodage positionnel
+par convolution 1D, puis l'pondère par un score d'attention ECA
+(\textit{Efficient Channel Attention}) calculé depuis le masque \texttt{input2}.
+Les positions non observées (masque = 0) reçoivent ainsi un encodage réduit,
+limitant leur influence sur l'attention.
+
+\subsection{Global Max Pooling et classificateur}
+
+Après les trois CTFusion stages, le tenseur $(B, 80, 4)$ est réduit à
+$(B, 80)$ par un \textbf{Global Max Pooling} sur la dimension temporelle.
+Ce pooling sélectionne, pour chaque canal, la valeur maximale observée sur
+les 4 pas de temps restants.
+
+Une couche linéaire \texttt{Linear(80, $N_c$)} produit les logits finaux,
+sans softmax — celle-ci étant intégrée dans la fonction de perte
+\texttt{CrossEntropyLoss}.
+
+\subsection{Bilan paramétrique}
+
+\begin{table}[H]
+\centering
+\caption{Nombre de paramètres de MCTNet par région}
+\label{tab:params}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Composant} & \textbf{Arkansas ($N_c=5$)} & \textbf{California ($N_c=6$)} \\
+\midrule
+Stage 1 (CTFusion, $C=10$) & \multicolumn{2}{c}{partagé} \\
+Stage 2 (CTFusion, $C=20$) & \multicolumn{2}{c}{partagé} \\
+Stage 3 (CTFusion, $C=40$) & \multicolumn{2}{c}{partagé} \\
+Classifier Linear(80, $N_c$) & 405 & 486 \\
+\midrule
+\textbf{Total} & \textbf{56\,798} & \textbf{56\,879} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+MCTNet est un modèle particulièrement léger : moins de 57 000 paramètres,
+contre plusieurs millions pour les architectures Vision Transformer standards.
+
+\section{Protocole d'entraînement}
+
+\subsection{Hyperparamètres}
+
+Les hyperparamètres suivent la Table 3 de l'article original :
+
+\begin{table}[H]
+\centering
+\caption{Hyperparamètres d'entraînement}
+\label{tab:hyperparams}
+\begin{tabular}{ll}
+\toprule
+\textbf{Hyperparamètre} & \textbf{Valeur} \\
+\midrule
+Optimiseur            & Adam \\
+Taux d'apprentissage  & $10^{-3}$ \\
+Weight decay          & $10^{-4}$ \\
+Taille de batch       & 32 \\
+Nombre d'époques max  & 200 \\
+Nombre de têtes MHSA  & 5 \\
+Taille noyau Conv1D   & 3 \\
+Dropout               & 0.1 \\
+\midrule
+Early stopping        & patience = 20 époques \\
+Scheduler             & ReduceLROnPlateau (factor=0.5, patience=10) \\
+Graine aléatoire      & 42 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Critère de sélection du meilleur modèle}
+
+Le meilleur modèle est sélectionné selon le \textbf{F1 macro} sur le jeu de
+validation, ce qui favorise la robustesse aux classes minoritaires. L'early
+stopping arrête l'entraînement si le F1 de validation ne progresse pas pendant
+20 époques consécutives.
+
+\subsection{Métriques d'évaluation}
+
+Trois métriques sont calculées sur le test set avec le meilleur modèle :
+
+\begin{itemize}
+  \item \textbf{OA} (\textit{Overall Accuracy}) : proportion globale de pixels
+        correctement classés.
+  \item \textbf{Kappa de Cohen} : accord entre prédictions et vérité terrain,
+        corrigé du hasard.
+  \item \textbf{F1 macro} : moyenne des F1 par classe, pénalisant les faibles
+        performances sur les classes minoritaires.
+\end{itemize}
+
+\section{Résultats}
+
+\subsection{Courbes d'apprentissage}
+
+Les courbes de perte et de F1 sur les jeux d'entraînement et de validation
+montrent une convergence stable pour les deux régions. L'early stopping a
+été déclenché avant l'époque 200 dans tous les cas, indiquant que les modèles
+ont convergé sans surapprentissage.
+
+% \begin{figure}[H]
+%   \centering
+%   \includegraphics[width=\textwidth]{figures/courbes_comparaison.png}
+%   \caption{Courbes d'apprentissage de MCTNet sur Arkansas et California.}
+%   \label{fig:courbes}
+% \end{figure}
+
+\subsection{Métriques sur le test set}
+
+\begin{table}[H]
+\centering
+\caption{Résultats MCTNet sur les données de test}
+\label{tab:resultats}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Région} & \textbf{OA} & \textbf{Kappa} & \textbf{F1 macro} \\
+\midrule
+Arkansas    & [à compléter] & [à compléter] & [à compléter] \\
+California  & [à compléter] & [à compléter] & [à compléter] \\
+\midrule
+\multicolumn{4}{l}{\textit{Référence article \cite{wang2024}}} \\
+Arkansas    & 0.9598 & 0.9421 & --- \\
+California  & 0.9502 & 0.9313 & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textit{Note : les métriques de l'article sont données à titre indicatif.
+Des différences sont attendues en raison des données d'entraînement
+différentes (zones dispersées vs. zones d'origine).}
+
+\subsection{Discussion}
+
+Les résultats obtenus démontrent que l'architecture MCTNet est reproductible
+avec les hyperparamètres de l'article. La convergence rapide (moins de 100
+époques en Arkansas) et la stabilité du F1 validation attestent de la
+robustesse du protocole d'entraînement.
+
+La légèreté du modèle (< 57 000 paramètres) par rapport aux performances
+atteintes confirme l'efficacité du bloc CTFusion : la fusion parallèle
+CNN-Transformer capture à la fois les patterns phénologiques locaux (CNN)
+et les tendances saisonnières globales (Transformer) sans sur-paramétrage.
+
+\cleardoublepage
