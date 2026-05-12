@@ -6,21 +6,45 @@
 \addcontentsline{toc}{chapter}{Introduction}
 \markboth{Introduction}{}
 
-Ce projet s'inscrit dans le cadre du module \textit{Réseaux de Neurones} et
-porte sur la classification de cultures agricoles à partir de séries
-temporelles d'images satellitaires Sentinel-2. L'objectif est de reproduire,
-analyser et améliorer le modèle MCTNet (\textit{Multi-stage CNN-Transformer
-Network}) proposé par Wang et al. \cite{wang2024}.
+La cartographie des cultures agricoles à grande échelle est un enjeu central
+pour la gestion des ressources alimentaires et le suivi environnemental. Les
+séries temporelles d'images satellitaires multibandes — notamment Sentinel-2
+avec ses 10 bandes spectrales et ses revisites décadaires — offrent une source
+d'information riche pour discriminer les cultures par leur signature phénologique.
+Cependant, la variabilité inter-régionale, les données manquantes liées à la
+couverture nuageuse, et la diversité des architectures de cultures rendent la
+tâche de classification difficile.
 
-Le travail est organisé en trois parties :
+Ce projet s'inscrit dans le cadre du module \textit{Réseaux de Neurones} et
+porte sur la classification de cultures agricoles à partir de séries temporelles
+d'images satellitaires Sentinel-2. Le point de départ est la reproduction et
+l'analyse du modèle MCTNet (\textit{Multi-stage CNN-Transformer Network})
+proposé par Wang et al.~\cite{wang2024}, qui combine des blocs CNN et Transformer
+en parallèle pour capturer conjointement les dépendances locales et globales
+des séries temporelles.
+
+Le travail est organisé en trois parties complémentaires :
 
 \begin{itemize}
-  \item \textbf{Partie 1} — Reproduction du modèle MCTNet de référence et
-        évaluation sur deux régions agricoles (Arkansas et Californie).
-  \item \textbf{Partie 2} — Exploration et analyse des données Sentinel-2 :
-        acquisition, preprocessing et visualisation.
-  \item \textbf{Partie 3} — Contribution architecturale : GatedMCTNet,
-        une variante avec fusion CNN-Transformer apprise dynamiquement.
+  \item \textbf{Partie 1} — Reproduction complète de MCTNet : collecte des
+        données via Google Earth Engine sur deux régions agricoles contrastées
+        (Arkansas, 5 classes ; Californie, 6 classes), exploration et
+        prétraitement, entraînement et évaluation. Les performances obtenues
+        (OA\,=\,0.9603 Arkansas, OA\,=\,0.9311 Californie) sont cohérentes
+        avec les résultats publiés.
+
+  \item \textbf{Partie 2} — Intégration de covariables environnementales :
+        enrichissement du modèle MCTNet par trois groupes de données exogènes
+        (propriétés pédologiques OpenLandMap, variables climatiques ERA5,
+        topographie ETOPO1/ALOS) et étude d'ablation systématique sur 7
+        configurations.
+
+  \item \textbf{Partie 3} — Trois contributions architecturales indépendantes :
+        \textbf{GatedMCTNet} (fusion CNN-Transformer dynamique par gate apprise),
+        \textbf{MCTNet Multiscale} (branche CNN multi-échelle à trois champs
+        réceptifs), et \textbf{MCTNetUSkip} (connexions skip préservant les
+        représentations à haute résolution temporelle, avec extension à un
+        encodeur-décodeur U-Net et covariables).
 \end{itemize}
 
 \cleardoublepage

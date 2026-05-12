@@ -6,26 +6,48 @@
 \addcontentsline{toc}{chapter}{Conclusion}
 \markboth{Conclusion}{}
 
-Ce projet a permis de reproduire, analyser et améliorer le modèle MCTNet
-pour la classification de cultures agricoles à partir de séries temporelles
-Sentinel-2.
+Ce projet a permis de reproduire, enrichir et améliorer le modèle MCTNet pour
+la classification de cultures agricoles à partir de séries temporelles Sentinel-2,
+à travers trois axes complémentaires.
 
-La \textbf{Partie 1} a confirmé la reproductibilité de MCTNet avec des
-performances cohérentes avec celles publiées dans \cite{wang2024}, tout en
-documentant le pipeline complet d'acquisition GEE et de preprocessing.
+\textbf{Partie 1.}
+La reproduction de MCTNet a été menée de bout en bout : collecte GEE sur 8 zones
+Arkansas et 4 zones Californie, prétraitement (masque données manquantes, normalisation,
+reshape), et entraînement avec le protocole original. Les performances reproduites
+(OA\,=\,0.9603 / Kappa\,=\,0.9504 en Arkansas ; OA\,=\,0.9311 / Kappa\,=\,0.9166
+en Californie) confirment la reproductibilité du modèle et servent de baseline
+pour toutes les contributions suivantes.
 
-La \textbf{Partie 2} a mis en évidence les caractéristiques des données :
-signatures phénologiques distinctes par culture, distribution des données
-manquantes liées à la couverture nuageuse, et importance de la stratégie
-d'échantillonnage spatial.
+\textbf{Partie 2.}
+L'intégration de covariables environnementales (sol, climat ERA5, topographie)
+dans une variante MCTNetWithCovars apporte des gains substantiels en Arkansas
+(jusqu'à +1.72 pts OA avec les seules propriétés pédologiques), région où les
+cultures sont fortement contraintes par les conditions des plaines alluviales.
+En Californie, seule la combinaison complète des trois groupes dépasse clairement
+le baseline (+0.46 pts OA), reflétant la plus grande diversité géographique
+et la présence de cultures pérennes.
 
-La \textbf{Partie 3} a introduit GatedMCTNet, une variante architecturale
-qui remplace la fusion fixe 50/50 du CTFusion par une gate apprise par
-canal. Cette contribution ajoute seulement 4 270 paramètres (+7.5\%) pour
-un gain de flexibilité dans la fusion CNN-Transformer.
+\textbf{Partie 3.}
+Trois contributions architecturales ont été évaluées :
+\begin{itemize}
+  \item \textbf{GatedMCTNet} améliore la baseline de +0.92 pts OA en Arkansas
+        avec seulement 4\,270 paramètres supplémentaires (+7.5\%). En Californie,
+        la gate nécessite davantage de données pour converger, entraînant une
+        légère régression.
+  \item \textbf{MCTNet Multiscale} apporte des gains modestes mais cohérents
+        sur les deux régions (+0.65 pts F1 Arkansas, +0.10 pts F1 Californie),
+        au prix d'une multiplication par 2.75 du nombre de paramètres
+        (56\,798 $\to$ 156\,198), avec un risque accru de surapprentissage.
+  \item \textbf{MCTNetUSkip} réintègre les représentations intermédiaires des
+        stages 1 et 2 via des connexions skip légères, améliorant les résultats
+        en Arkansas (+0.34 pts OA) avec \emph{moins} de paramètres que MCTNet.
+        Son extension en encodeur-décodeur U-Net avec covariables atteint
+        OA\,=\,0.9785 en Arkansas (configuration Sol+Topo) et OA\,=\,0.9395
+        en Californie (configuration complète).
+\end{itemize}
 
-Ces travaux ouvrent plusieurs perspectives : entraînement sur un jeu de
-données plus large pour consolider les résultats de la gate en Californie,
-extension de l'approche à d'autres régions géographiques, et exploration
-de mécanismes de gate plus expressifs (attention spatiale, gate par tête
-d'attention).
+Ces travaux ouvrent plusieurs perspectives : consolidation des résultats de
+GatedMCTNet en Californie sur un jeu d'entraînement plus large, régularisation
+du Multiscale (dropout, pruning des kernels redondants), et exploration de
+mécanismes d'attention croisée entre la branche sérielle et la branche
+covariables pour mieux exploiter l'information exogène.

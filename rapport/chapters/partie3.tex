@@ -415,6 +415,13 @@ MCTNetUSkip & California & 0.9283 & 0.9133 & 0.9308 \\
 \subsection{Résultats — UNetMCTNetWithCovars : étude d'ablation}
 \label{subsec:ablation_covars}
 
+\noindent\textbf{Note.} Les résultats ci-dessous concernent \textbf{UNetMCTNetWithCovars}
+(encodeur-décodeur U-Net complet, 113\,566 paramètres), qui est une architecture
+distincte du \texttt{MCTNetWithCovars} présenté en Partie~2 (encodeur MCTNet +
+branche MLP covariables, $\approx$58\,000 paramètres). Les différences de
+performances entre les deux ablations reflètent cette différence architecturale.
+
+\medskip
 L'apport de chaque groupe de covariables est évalué par ablation sur sept
 configurations. Les covariables sont : sol (\textit{sol} : pH, carbone
 organique, texture — 3 variables), climat (\textit{clim} : ERA5 36
