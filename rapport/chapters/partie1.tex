@@ -55,185 +55,302 @@ un compromis efficace en combinant les deux à chaque stage.
 
 \subsection{Source et régions d'étude}
 
-Les données Sentinel-2 ont été acquises via \textbf{Google Earth Engine}
-sur deux régions agricoles américaines :
+Les données Sentinel-2 Level-2A ont été acquises via \textbf{Google Earth
+Engine} pour l'année 2021 sur deux régions agricoles américaines aux
+profils très différents :
 
 \begin{itemize}
-  \item \textbf{Arkansas} — état du sud des États-Unis, dominé par des
-        cultures en rotation (Corn, Cotton, Rice, Soybeans). Climat humide
-        subtropical avec une forte couverture nuageuse en hiver.
+  \item \textbf{Arkansas} — état du sud, dominé par des cultures annuelles
+        en rotation (Corn, Cotton, Rice, Soybeans). Climat humide subtropical
+        avec une forte couverture nuageuse en hiver (taux de données
+        manquantes : 23.9\,\%, dont 3 pas de temps entièrement absents).
   \item \textbf{California} — état de l'ouest, caractérisé par des cultures
         pérennes (Grapes, Almonds, Pistachios) et irriguées (Rice, Alfalfa).
-        Climat méditerranéen avec une saison sèche marquée.
+        Climat méditerranéen plus favorable à l'observation satellite (taux
+        de données manquantes : 16.1\,\%).
 \end{itemize}
 
 Les labels de référence proviennent du \textbf{Cropland Data Layer (CDL)}
-de l'USDA, une carte de cultures à 30 m de résolution produite annuellement
-par télédétection et vérifiée sur le terrain.
+de l'USDA (résolution 30\,m, confiance $\geq 95\,\%$), validés par le masque
+\textbf{ESA WorldCover 2021} (classe Cropland).
+
+\subsection{Stratégie de zonage}
+
+L'échantillonnage sur l'état entier provoquait des timeouts Google Earth
+Engine. La solution adoptée consiste à découper chaque état en petites
+bounding boxes ($\approx 0.5° \times 0.4°$) ciblant les zones agricoles
+connues, exporter chaque zone séparément, puis fusionner en Python.
+
+\textbf{Arkansas — 5 zones :}
+
+\begin{table}[H]
+\centering
+\caption{Zones d'échantillonnage — Arkansas}
+\label{tab:zones_ark}
+\begin{tabular}{lll}
+\toprule
+\textbf{Zone} & \textbf{Région} & \textbf{Bounding Box} \\
+\midrule
+Z1 & Delta central        & [-91.75, 34.40, -91.25, 34.80] \\
+Z2 & Sud Delta            & [-92.10, 33.80, -91.60, 34.20] \\
+Z3 & Stuttgart (riz)      & [-91.65, 34.60, -91.15, 35.00] \\
+Z4 & Jonesboro (maïs/soja)& [-90.90, 35.60, -90.40, 36.00] \\
+Z5 & Pine Bluff (coton)   & [-91.80, 33.40, -91.30, 33.80] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{California — 8 zones} (5 initiales + 3 ajoutées pour rééquilibrer
+Alfalfa et Pistachios, sous-représentés) :
+
+\begin{table}[H]
+\centering
+\caption{Zones d'échantillonnage — California}
+\label{tab:zones_cal}
+\begin{tabular}{lll}
+\toprule
+\textbf{Zone} & \textbf{Région} & \textbf{Bounding Box} \\
+\midrule
+Z1 & Sacramento Valley         & [-122.20, 39.00, -121.80, 39.40] \\
+Z2 & San Joaquin (centre)      & [-120.10, 36.80, -119.70, 37.20] \\
+Z3 & Fresno (raisins/amandes)  & [-119.95, 36.55, -119.55, 36.95] \\
+Z4 & Bakersfield (pistaches)   & [-119.40, 35.20, -119.00, 35.60] \\
+Z5 & Colusa (riz)              & [-122.10, 39.10, -121.70, 39.50] \\
+Z6 & Imperial Valley (alfalfa) & [-115.70, 32.70, -115.30, 33.10] \\
+Z7 & Sud Kern County           & [-119.70, 35.40, -119.30, 35.80] \\
+Z8 & Tulare County             & [-119.50, 35.90, -119.10, 36.30] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Paramètres de collecte}
+
+\begin{table}[H]
+\centering
+\caption{Paramètres de collecte GEE}
+\label{tab:params_gee}
+\begin{tabular}{lll}
+\toprule
+\textbf{Paramètre} & \textbf{Valeur} & \textbf{Justification} \\
+\midrule
+Satellite        & Sentinel-2 L2A     & Réflectances de surface (corrigées atmosphériquement) \\
+Période          & Année 2021         & Cohérent avec l'article \\
+Fenêtre          & 10 jours           & Composites médianes décadaires \\
+Pas de temps     & 36                 & 365 / 10 $\approx$ 36 \\
+Résolution       & 30\,m              & Cohérente avec le CDL \\
+Filtre nuages    & CLOUDY\_PIXEL\_PERCENTAGE $<$ 20\,\% & Élimination des scènes très nuageuses \\
+Masque pixel     & Bits 10 et 11 de QA60 & Nuages opaques et cirrus \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Les fenêtres sans aucune observation valide reçoivent la valeur 0
+(\textit{unmask(0)}), signalant une donnée manquante exploitée ensuite
+par le module ALPE.
 
 \subsection{Format des données}
 
 Chaque pixel est décrit par trois tenseurs :
 
 \begin{itemize}
-  \item \texttt{input1} : $(N,\,10,\,36)$ — réflectances spectrales sur les
-        10 bandes Sentinel-2 sélectionnées, normalisées par bande (mean/std
-        calculés sur le train set uniquement).
-  \item \texttt{input2} : $(N,\,36)$ — masque de disponibilité binaire
-        (1 = observation valide, 0 = occultée par nuage ou hors scène).
+  \item \texttt{input1} : $(N,\,10,\,36)$ — réflectances normalisées
+        ($\div\,10\,000$, puis les valeurs 0 indiquent un pas de temps manquant).
+  \item \texttt{input2} : $(N,\,36)$ — masque binaire construit avant
+        normalisation : 1 si au moins une bande est non nulle, 0 sinon.
   \item \texttt{labels} : $(N,)$ — indice de classe entier.
 \end{itemize}
 
 \subsection{Bandes spectrales}
 
-Les 10 bandes Sentinel-2 retenues couvrent le visible, le proche infrarouge
-et le moyen infrarouge :
+Les bandes 1, 9 et 10 (résolution 60\,m) sont exclues. Les \textbf{10 bandes
+retenues} couvrent le visible, les Red Edge, le NIR et le SWIR :
 
 \begin{table}[H]
 \centering
 \caption{Bandes Sentinel-2 utilisées}
 \label{tab:bandes}
-\begin{tabular}{llll}
+\begin{tabular}{lllll}
 \toprule
-\textbf{Bande} & \textbf{Nom} & \textbf{Longueur d'onde} & \textbf{Résolution} \\
+\textbf{Bande} & \textbf{Nom} & \textbf{$\lambda$} & \textbf{Résolution} & \textbf{Information principale} \\
 \midrule
-B2  & Blue       & 490 nm  & 10 m \\
-B3  & Green      & 560 nm  & 10 m \\
-B4  & Red        & 665 nm  & 10 m \\
-B5  & Red Edge 1 & 705 nm  & 20 m \\
-B6  & Red Edge 2 & 740 nm  & 20 m \\
-B7  & Red Edge 3 & 783 nm  & 20 m \\
-B8  & NIR        & 842 nm  & 10 m \\
-B8A & NIR narrow & 865 nm  & 20 m \\
-B11 & SWIR 1     & 1610 nm & 20 m \\
-B12 & SWIR 2     & 2190 nm & 20 m \\
+B2  & Blue       & 490 nm  & 10 m & Couleur, atmosphère \\
+B3  & Green      & 560 nm  & 10 m & Réflexion chlorophylle \\
+B4  & Red        & 665 nm  & 10 m & Absorption chlorophylle \\
+B5  & Red Edge 1 & 705 nm  & 20 m & Stress végétal \\
+B6  & Red Edge 2 & 740 nm  & 20 m & Teneur en chlorophylle \\
+B7  & Red Edge 3 & 783 nm  & 20 m & Structure du couvert \\
+B8  & NIR        & 842 nm  & 10 m & Biomasse, densité végétale \\
+B8A & Red Edge 4 & 865 nm  & 20 m & Santé et vigueur \\
+B11 & SWIR 1     & 1610 nm & 20 m & Teneur en eau \\
+B12 & SWIR 2     & 2190 nm & 20 m & Stress hydrique \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{Dimension temporelle}
 
-Chaque série couvre 36 pas de temps correspondant à des composites
-bi-mensuels sur 18 mois (ou mensuels sur 3 ans), permettant de capturer
-l'intégralité du cycle phénologique des cultures.
+L'année 2021 est découpée en \textbf{36 fenêtres de 10 jours}. Pour
+chaque fenêtre, la \textbf{médiane} des observations valides (sans nuages)
+est calculée pixel par pixel. La médiane est préférée à la moyenne pour
+sa robustesse aux nuages non détectés (valeurs aberrantes) :
+
+\begin{equation}
+  \text{composite}_t = \text{median}\!\big\{x_i \;\mid\; x_i \text{ valide dans } [t, t+10\text{j}]\big\}
+\end{equation}
 
 % ============================================================
 \section{Exploration des données}
 \label{sec:exploration}
 
-\subsection{Classes de cultures}
-
-\begin{table}[H]
-\centering
-\caption{Classes de cultures par région}
-\label{tab:classes}
-\begin{tabular}{llll}
-\toprule
-\textbf{Arkansas} & \textbf{Indice} & \textbf{California} & \textbf{Indice} \\
-\midrule
-Corn     & 0 & Rice       & 0 \\
-Cotton   & 1 & Alfalfa    & 1 \\
-Rice     & 2 & Grapes     & 2 \\
-Soybeans & 3 & Almonds    & 3 \\
-Others   & 4 & Pistachios & 4 \\
-         &   & Others     & 5 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Répartition des échantillons}
-
-\begin{table}[H]
-\centering
-\caption{Répartition train / val / test}
-\label{tab:splits}
-\begin{tabular}{lrrr}
-\toprule
-\textbf{Région} & \textbf{Train} & \textbf{Val} & \textbf{Test} \\
-\midrule
-Arkansas   & 1\,200 & 300 & 8\,523 \\
-California & 1\,440 & 360 & 8\,226 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Les pixels sont échantillonnés dans des \textbf{zones géographiquement
-dispersées} à travers chaque région, afin d'éviter l'autocorrélation spatiale
-entre les splits train et test.
-
 \subsection{Distribution des classes}
 
-% \begin{figure}[H]
-%   \centering
-%   \includegraphics[width=0.85\textwidth]{figures/class_distribution.png}
-%   \caption{Distribution des classes dans le jeu d'entraînement — Arkansas (gauche) et California (droite).}
-%   \label{fig:class_dist}
-% \end{figure}
+\begin{table}[H]
+\centering
+\caption{Distribution des échantillons par classe — Arkansas}
+\label{tab:dist_ark}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Classe} & \textbf{Total} & \textbf{Train} & \textbf{Val} & \textbf{Test} \\
+\midrule
+Soybeans & 4\,677 & 240 & 60 & 4\,377 \\
+Rice     & 2\,423 & 240 & 60 & 2\,123 \\
+Corn     & 1\,522 & 240 & 60 & 1\,222 \\
+Cotton   &   762  & 240 & 60 &   462  \\
+Others   &   616  & 240 & 60 &   316  \\
+\midrule
+\textbf{Total} & \textbf{10\,000} & \textbf{1\,200} & \textbf{300} & \textbf{8\,500} \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-[À compléter — figures/class\_distribution.png]
+\begin{table}[H]
+\centering
+\caption{Distribution des échantillons par classe — California}
+\label{tab:dist_cal}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Classe} & \textbf{Total} & \textbf{Train} & \textbf{Val} & \textbf{Test} \\
+\midrule
+Grapes     & 2\,054 & 240 & 60 & 1\,754 \\
+Rice       & 2\,037 & 240 & 60 & 1\,737 \\
+Alfalfa    &   974  & 240 & 60 &   674  \\
+Almonds    &   783  & 240 & 60 &   483  \\
+Pistachios &   640  & 240 & 60 &   340  \\
+Others     & 3\,512 & 240 & 60 & 3\,212 \\
+\midrule
+\textbf{Total} & \textbf{10\,000} & \textbf{1\,440} & \textbf{360} & \textbf{8\,200} \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\subsection{Profils phénologiques}
+La stratégie de partitionnement est \textbf{équilibrée} : 300 pixels par
+classe sont réservés pour train+val (240/60), indépendamment de l'abondance
+naturelle de chaque classe. Le reste — souvent très majoritaire — forme le
+test set, représentatif de la vraie distribution géographique.
 
-Chaque culture présente une signature temporelle caractéristique dans les
-bandes spectrales. Le Rice en Arkansas montre un pic de réflectance NIR
-concentré sur juillet--août, correspondant à son cycle de croissance rapide.
-Les cultures pérennes (Alfalfa, Grapes en Californie) présentent un signal
-NIR élevé et stable sur toute la saison. Ces différences phénologiques
-constituent l'information discriminante exploitée par MCTNet.
+\subsection{Profils phénologiques (NDVI)}
 
-% \begin{figure}[H]
-%   \centering
-%   \includegraphics[width=\textwidth]{figures/timeseries_par_classe.png}
-%   \caption{Séries temporelles moyennes par classe (bande NIR) — Arkansas (haut) et California (bas).}
-%   \label{fig:timeseries}
-% \end{figure}
+Chaque culture présente une signature temporelle caractéristique. Le pic
+de NDVI intervient à des moments distincts de l'année :
 
-[À compléter — figures/timeseries\_par\_classe.png]
+\begin{table}[H]
+\centering
+\caption{Décalages phénologiques observés — Arkansas}
+\label{tab:phenologie}
+\begin{tabular}{ll}
+\toprule
+\textbf{Culture} & \textbf{Pic NDVI} \\
+\midrule
+Corn     & DOY $\approx$ 170 (mi-juin) \\
+Rice     & DOY $\approx$ 200 (mi-juillet) \\
+Soybeans & DOY $\approx$ 220 (début août) \\
+Cotton   & DOY $\approx$ 240 (fin août) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Ces décalages phénologiques constituent l'information discriminante
+principale exploitée par MCTNet via sa branche Transformer.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{figures/timeseries_par_classe.png}
+  \caption{Courbes NDVI moyennes par classe — Arkansas et California.}
+  \label{fig:timeseries}
+\end{figure}
 
 \subsection{Données manquantes}
 
-La couverture nuageuse génère des gaps dans les séries temporelles,
-encodés dans le masque \texttt{input2}. L'Arkansas, plus humide, présente
-un taux de données manquantes plus élevé en hiver. La California, plus
-sèche, a des séries quasi complètes en été mais dégradées en hiver.
+\begin{table}[H]
+\centering
+\caption{Statistiques de données manquantes}
+\label{tab:manquants}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Région} & \textbf{Taux global} & \textbf{Pas de temps entièrement absents} \\
+\midrule
+Arkansas   & 23.9\,\% & 3 (t3, t15, t34) \\
+California & 16.1\,\% & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-% \begin{figure}[H]
-%   \centering
-%   \includegraphics[width=0.8\textwidth]{figures/mask_analysis.png}
-%   \caption{Taux de données manquantes par pas de temps — Arkansas (bleu) et California (orange).}
-%   \label{fig:mask}
-% \end{figure}
-
-[À compléter — figures/mask\_analysis.png]
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figures/mask_analysis.png}
+  \caption{Taux de données manquantes par pas de temps — Arkansas et California.}
+  \label{fig:mask}
+\end{figure}
 
 % ============================================================
 \section{Prétraitement}
 \label{sec:preprocessing}
 
-\subsection{Filtrage des nuages}
+\subsection{Construction du masque (Input 2)}
 
-Les observations invalides sont identifiées via le masque SCL
-(\textit{Scene Classification Layer}) de Sentinel-2 et encodées dans
-\texttt{input2}. Aucune interpolation n'est appliquée : les valeurs
-manquantes sont conservées telles quelles, et le module ALPE se charge
+Le masque est construit \textbf{avant} toute normalisation. Un pas de
+temps est considéré manquant si toutes ses bandes valent simultanément 0
+(convention GEE pour les fenêtres sans observation valide) :
+
+\begin{equation}
+  \text{mask}_{n,t} =
+  \begin{cases}
+    0 & \text{si } \sum_{b=1}^{10} x_{n,b,t} = 0 \\
+    1 & \text{sinon}
+  \end{cases}
+\end{equation}
+
+Aucune interpolation n'est appliquée sur les valeurs manquantes : les 0
+sont conservés dans \texttt{input1} et c'est le module ALPE qui se charge
 de les atténuer lors du traitement.
 
 \subsection{Normalisation}
 
-Les réflectances sont normalisées par bande :
+Sentinel-2 stocke les réflectances sous forme d'entiers multipliés par
+10\,000. La normalisation divise par cette constante pour ramener les
+valeurs dans $[0, 1]$ :
 
 \begin{equation}
-  \hat{x}_{b,t} = \frac{x_{b,t} - \mu_b}{\sigma_b}
+  \hat{x}_{n,b,t} = \frac{x_{n,b,t}}{10\,000}
 \end{equation}
 
-où $\mu_b$ et $\sigma_b$ sont calculés \textbf{exclusivement sur le train
-set} et appliqués ensuite à val et test, évitant toute fuite de données.
+Les valeurs 0 (données manquantes) restent à 0 après normalisation, ce
+qui est voulu. Cette opération est appliquée identiquement sur train, val
+et test, sans fuite de données.
 
-\subsection{Stratégie d'échantillonnage}
+\subsection{Restructuration en tenseurs}
 
-Les pixels d'entraînement sont extraits de zones géographiquement dispersées.
-Cette approche garantit que le modèle généralise à des zones non vues plutôt
-que de mémoriser des structures spatiales locales.
+Les CSV exportés depuis GEE sont en format plat (360 colonnes par ligne,
+nommées selon la convention \texttt{B2, B2\_1, ..., B12\_35}). La
+restructuration en tenseurs \textit{channels-first} suit :
+
+\begin{equation}
+  (N, 360) \;\xrightarrow{\text{reshape}}\; (N, 36, 10)
+            \;\xrightarrow{\text{transpose}}\; (N, 10, 36)
+\end{equation}
+
+Le format $(N, 10, 36)$ est le format \textit{channels-first} attendu par
+les convolutions 1D de PyTorch.
 
 % ============================================================
 \section{Architecture de MCTNet}
