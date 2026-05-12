@@ -81,7 +81,7 @@ Engine. La solution adoptée consiste à découper chaque état en petites
 bounding boxes ($\approx 0.5° \times 0.4°$) ciblant les zones agricoles
 connues, exporter chaque zone séparément, puis fusionner en Python.
 
-\textbf{Arkansas — 5 zones :}
+\textbf{Arkansas — 8 zones} (250 pts/classe/zone $\times$ 8 zones $\times$ 5 classes = 10\,000) :
 
 \begin{table}[H]
 \centering
@@ -91,17 +91,19 @@ connues, exporter chaque zone séparément, puis fusionner en Python.
 \toprule
 \textbf{Zone} & \textbf{Région} & \textbf{Bounding Box} \\
 \midrule
-Z1 & Delta central        & [-91.75, 34.40, -91.25, 34.80] \\
-Z2 & Sud Delta            & [-92.10, 33.80, -91.60, 34.20] \\
-Z3 & Stuttgart (riz)      & [-91.65, 34.60, -91.15, 35.00] \\
-Z4 & Jonesboro (maïs/soja)& [-90.90, 35.60, -90.40, 36.00] \\
-Z5 & Pine Bluff (coton)   & [-91.80, 33.40, -91.30, 33.80] \\
+Z1a & Nord-Est (Jonesboro)   & [-91.5, 35.5, -91.0, 36.0] \\
+Z1b & Nord-Est               & [-91.0, 35.5, -90.5, 36.0] \\
+Z1c & Centre-Est             & [-91.5, 35.0, -91.0, 35.5] \\
+Z1d & Centre-Est             & [-91.0, 35.0, -90.5, 35.5] \\
+Z2a & Delta Ouest            & [-92.5, 34.5, -92.0, 35.0] \\
+Z2b & Delta Central          & [-92.0, 34.0, -91.5, 35.0] \\
+Z3a & Sud Delta              & [-91.5, 34.0, -91.0, 34.5] \\
+Z3b & Sud-Est                & [-91.0, 33.5, -90.5, 34.5] \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{California — 8 zones} (5 initiales + 3 ajoutées pour rééquilibrer
-Alfalfa et Pistachios, sous-représentés) :
+\textbf{California — 4 zones} ($\approx$ 560 pts/classe/zone $\times$ 4 zones $\times$ 6 classes $\approx$ 10\,000) :
 
 \begin{table}[H]
 \centering
@@ -111,14 +113,10 @@ Alfalfa et Pistachios, sous-représentés) :
 \toprule
 \textbf{Zone} & \textbf{Région} & \textbf{Bounding Box} \\
 \midrule
-Z1 & Sacramento Valley         & [-122.20, 39.00, -121.80, 39.40] \\
-Z2 & San Joaquin (centre)      & [-120.10, 36.80, -119.70, 37.20] \\
-Z3 & Fresno (raisins/amandes)  & [-119.95, 36.55, -119.55, 36.95] \\
-Z4 & Bakersfield (pistaches)   & [-119.40, 35.20, -119.00, 35.60] \\
-Z5 & Colusa (riz)              & [-122.10, 39.10, -121.70, 39.50] \\
-Z6 & Imperial Valley (alfalfa) & [-115.70, 32.70, -115.30, 33.10] \\
-Z7 & Sud Kern County           & [-119.70, 35.40, -119.30, 35.80] \\
-Z8 & Tulare County             & [-119.50, 35.90, -119.10, 36.30] \\
+Z1 & Sacramento Valley              & [-122.2, 38.8, -121.4, 39.6] \\
+Z2 & San Joaquin (centre)           & [-120.8, 36.8, -119.8, 37.6] \\
+Z3 & Fresno / Bakersfield           & [-119.8, 35.5, -118.8, 36.3] \\
+Z4 & Imperial Valley (alfalfa)      & [-115.8, 32.6, -115.2, 33.2] \\
 \bottomrule
 \end{tabular}
 \end{table}
