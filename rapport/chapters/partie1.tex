@@ -504,7 +504,27 @@ Notre reproduction & California & 0.9311 & 0.9166 & 0.9339 \\
 
 \subsection{Discussion}
 
-[À compléter selon les résultats obtenus — écart avec le papier original,
-comportement de la loss, convergence, overfitting éventuel.]
+Sur l'Arkansas, la reproduction est fidèle : notre OA (0.9603) dépasse
+légèrement celle du papier (0.9598), et le Kappa est nettement supérieur
+(0.9504 vs 0.9421). Cet écart positif sur le Kappa suggère que notre
+pipeline de collecte et de prétraitement produit des données de qualité
+comparable, voire légèrement plus propres sur ce jeu.
+
+Sur la Californie, un écart de $-1.9$ points d'OA (0.9311 vs 0.9502)
+est observable. Plusieurs facteurs l'expliquent. D'abord, le jeu
+d'entraînement California comporte 6 classes au lieu de 5, ce qui
+complexifie la tâche à nombre d'exemples équivalent par classe (240).
+Ensuite, les cultures pérennes (Grapes, Almonds, Pistachios) présentent
+des phénologies lentes et partiellement superposées, rendant leur
+discrimination plus sensible à la quantité de données. Enfin, les 8 zones
+de collecte couvrent une région géographiquement plus étendue et climatiquement
+plus hétérogène que l'Arkansas, ce qui introduit davantage de variabilité
+intra-classe.
+
+Les courbes de loss confirment une convergence saine sur les deux régions,
+sans signe d'overfitting majeur : les losses train et validation descendent
+parallèlement jusqu'à l'arrêt précoce (early stopping déclenché vers
+l'époque 60). La légère oscillation de la loss de validation en California
+est cohérente avec la plus grande difficulté de ce jeu.
 
 \cleardoublepage
