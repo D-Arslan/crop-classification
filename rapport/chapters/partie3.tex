@@ -107,21 +107,21 @@ GatedMCTNet  & 61\,068 & +4\,270 (+7.5\%) \\
 \toprule
 \textbf{Modèle} & \textbf{Région} & \textbf{OA} & \textbf{Kappa} & \textbf{F1 macro} \\
 \midrule
-MCTNet      & Arkansas   & [résultat] & [résultat] & [résultat] \\
-GatedMCTNet & Arkansas   & [résultat] & [résultat] & [résultat] \\
+MCTNet      & Arkansas   & 0.9603 & 0.9504 & 0.9603 \\
+GatedMCTNet & Arkansas   & 0.9695 & 0.9618 & 0.9696 \\
 \midrule
-MCTNet      & California & [résultat] & [résultat] & [résultat] \\
-GatedMCTNet & California & [résultat] & [résultat] & [résultat] \\
+MCTNet      & California & 0.9311 & 0.9166 & 0.9339 \\
+GatedMCTNet & California & 0.9237 & 0.9077 & 0.9257 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-% \begin{figure}[H]
-%   \centering
-%   \includegraphics[width=\textwidth]{figures/courbes_gated.png}
-%   \caption{Courbes d'apprentissage — MCTNet vs GatedMCTNet.}
-%   \label{fig:courbes_gated}
-% \end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{figures/courbes_gated.png}
+  \caption{Courbes d'apprentissage — MCTNet vs GatedMCTNet (Loss, OA val, F1 val).}
+  \label{fig:courbes_gated}
+\end{figure}
 
 \subsection{Discussion}
 
@@ -257,8 +257,8 @@ MCTNetUSkip  & California & [résultat] & [résultat] & [résultat] \\
 \toprule
 \textbf{Modèle} & \textbf{OA} & \textbf{Kappa} & \textbf{F1 macro} & \textbf{Paramètres} \\
 \midrule
-MCTNet (baseline) & [résultat] & [résultat] & [résultat] & 56\,798 \\
-GatedMCTNet       & [résultat] & [résultat] & [résultat] & 61\,068 \\
+MCTNet (baseline) & 0.9603 & 0.9504 & 0.9603 & 56\,798 \\
+GatedMCTNet       & 0.9695 & 0.9618 & 0.9696 & 61\,068 \\
 MCTNet Multiscale & [résultat] & [résultat] & [résultat] & 56\,798 \\
 MCTNetUSkip       & [résultat] & [résultat] & [résultat] & [résultat] \\
 \bottomrule
@@ -273,8 +273,8 @@ MCTNetUSkip       & [résultat] & [résultat] & [résultat] & [résultat] \\
 \toprule
 \textbf{Modèle} & \textbf{OA} & \textbf{Kappa} & \textbf{F1 macro} & \textbf{Paramètres} \\
 \midrule
-MCTNet (baseline) & [résultat] & [résultat] & [résultat] & 56\,879 \\
-GatedMCTNet       & [résultat] & [résultat] & [résultat] & 61\,149 \\
+MCTNet (baseline) & 0.9311 & 0.9166 & 0.9339 & 56\,879 \\
+GatedMCTNet       & 0.9237 & 0.9077 & 0.9257 & 61\,149 \\
 MCTNet Multiscale & [résultat] & [résultat] & [résultat] & 56\,879 \\
 MCTNetUSkip       & [résultat] & [résultat] & [résultat] & [résultat] \\
 \bottomrule
