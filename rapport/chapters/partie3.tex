@@ -181,41 +181,137 @@ MCTNet Multiscale & California & [résultat] & [résultat] & [résultat] \\
 [À compléter.]
 
 % ============================================================
-\section{Contribution 3 — MCTNetUSkip : connexions skip de type U-Net}
+\section{Contribution 3 — MCTNetUSkip : connexions skip et covariables}
 \label{sec:uskip}
 
 \subsection{Motivation}
 
-Dans MCTNet, l'information circule uniquement de façon progressive vers le
-bas de l'encodeur (Stage 1 → 2 → 3). Les représentations à haute résolution
-temporelle du Stage 1 ne sont pas réutilisées lors de la classification. En
-s'inspirant de l'architecture U-Net \cite{ronneberger2015}, des connexions
-skip permettent de propager ces représentations directement vers la sortie,
-préservant les détails fins de la série temporelle.
+Dans MCTNet, chaque stage réduit la résolution temporelle par un facteur 2
+via MaxPool1D : $T=36 \to 18 \to 9 \to 4$. L'encodeur final ne conserve que
+les représentations à basse résolution temporelle (Stage 3, $T=4$), tandis que
+les représentations intermédiaires des Stages 1 et 2 — qui encodent des
+détails phénologiques fins (pics de verdure, transitions rapides) — sont
+définitivement perdues avant la classification.
 
-\subsection{Architecture — MCTNetUSkip}
+Deux améliorations complémentaires sont proposées :
+\begin{enumerate}
+  \item \textbf{MCTNetUSkip} : réintégrer les représentations intermédiaires
+        par des connexions skip légères vers la couche de classification.
+  \item \textbf{UNetMCTNetWithCovars} : étendre le modèle avec un décodeur
+        U-Net complet et une branche covariables (sol, climat, topographie)
+        pour évaluer l'apport de données auxiliaires.
+\end{enumerate}
 
-[À compléter — décrire les connexions skip : quels stages sont connectés,
-comment les sorties intermédiaires sont agrégées (concaténation, addition,
-attention), dimensions résultantes.]
+% ------------------------------------------------------------
+\subsection{Architecture V1 — MCTNetUSkip (connexions skip légères)}
+\label{subsec:uskip_v1}
 
-\subsection{Bilan paramétrique}
+MCTNetUSkip modifie \texttt{CTFusionSkip} pour sauvegarder la sortie fusionnée
+\emph{avant} le MaxPool1D à chaque stage. Cette sortie intermédiaire est
+projetée en vecteur fixe par un Global Max Pooling (GMP) puis concaténée avec
+la sortie du Stage 3 avant la couche linéaire finale.
+
+\textbf{Flux de données :}
+\begin{enumerate}
+  \item Stage 1 : $(B, C_1, 36) \xrightarrow{\text{CTFusion}} (B, 20, 36)
+        \xrightarrow{\text{GMP}} (B, 20)$ \quad \textit{[skip 1]}
+  \item MaxPool1D $\to (B, 20, 18)$
+  \item Stage 2 : $(B, 20, 18) \xrightarrow{\text{CTFusion}} (B, 40, 18)
+        \xrightarrow{\text{GMP}} (B, 40)$ \quad \textit{[skip 2]}
+  \item MaxPool1D $\to (B, 40, 9)$
+  \item Stage 3 : $(B, 40, 9) \xrightarrow{\text{CTFusion}} (B, 80, 4)
+        \xrightarrow{\text{GMP}} (B, 80)$ \quad \textit{[encodeur]}
+  \item Concaténation : $\big[(B,20),\,(B,40),\,(B,80)\big]
+        \to (B, 140)$
+  \item Classificateur : $\text{Linear}(140, 64) \to \text{ReLU} \to
+        \text{Linear}(64, N_c)$
+\end{enumerate}
+
+La modification est minimale : aucun paramètre supplémentaire n'est ajouté
+dans l'encodeur. Le coût provient uniquement du classificateur élargi.
 
 \begin{table}[H]
 \centering
-\caption{Comparaison MCTNet vs MCTNetUSkip}
+\caption{Bilan paramétrique — MCTNet vs MCTNetUSkip}
 \label{tab:params_uskip}
 \begin{tabular}{lrr}
 \toprule
 \textbf{Modèle} & \textbf{Paramètres} & \textbf{Différence} \\
 \midrule
 MCTNet       & 56\,798 & --- \\
-MCTNetUSkip  & [résultat] & [résultat] \\
+MCTNetUSkip  & 50\,842 & $-5\,956$ ($-10.5$\,\%) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Résultats}
+\noindent
+La réduction s'explique par le remplacement du classificateur MCTNet
+($\text{GMP} \to \text{Linear}(80, N_c)$) par une tête plus légère mais plus
+large en entrée ($\text{Linear}(140,64) + \text{Linear}(64,N_c)$, soit
+$9\,024 + 64 \cdot N_c$ paramètres contre $80 \cdot N_c$ dans MCTNet).
+
+% ------------------------------------------------------------
+\subsection{Architecture V2 — UNetMCTNetWithCovars (encodeur-décodeur + covariables)}
+\label{subsec:uskip_v2}
+
+La deuxième variante adopte une architecture encodeur-décodeur complète
+inspirée de U-Net \cite{ronneberger2015}, et intègre une branche covariables
+distincte.
+
+\subsubsection{Encodeur}
+
+Identique à MCTNet : trois stages CTFusion avec MaxPool1D (stride 2),
+produisant les cartes $e_1 \in \mathbb{R}^{B\times 20 \times 36}$,
+$e_2 \in \mathbb{R}^{B\times 40 \times 18}$,
+$e_3 \in \mathbb{R}^{B\times 80 \times 9}$.
+
+\subsubsection{Goulot d'étranglement}
+
+Un bloc CNN résiduel (ResBlock1D) opère sur $(B, 80, 4)$ après un MaxPool1D
+supplémentaire, constituant la représentation la plus compressée de la série.
+
+\subsubsection{Décodeur}
+
+Trois blocs \texttt{UpCTF} reconstruisent progressivement la résolution
+temporelle :
+\begin{equation}
+  \text{UpCTF}(d_{\ell+1}, e_\ell) :
+  \underbrace{d_{\ell+1} \xrightarrow{\text{ConvTranspose1d}(\times 2)}
+  \hat{d}}_{\text{sur-échantillonnage}}
+  \;\to\;
+  \big[\hat{d},\, e_\ell\big]
+  \;\to\;
+  \text{CTFusion}
+\end{equation}
+La résolution est restaurée de $T=4$ à $T=9$, $T=18$, puis $T=36$.
+
+\subsubsection{Branche covariables}
+
+Les covariables (sol, climat ERA5, topographie) sont concaténées en un vecteur
+de dimension 113, passé dans un MLP :
+\begin{equation}
+  \text{cov\_branch} : \mathbb{R}^{113}
+  \xrightarrow{\text{Linear}(113,64)} \text{ReLU}
+  \xrightarrow{\text{Linear}(64,32)} \text{ReLU}
+  \to \mathbb{R}^{32}
+\end{equation}
+
+\subsubsection{Fusion finale}
+
+La sortie du décodeur $d_1 \in \mathbb{R}^{B \times 10 \times 36}$ est agrégée
+par GMP en $(B, 10)$, puis concaténée avec la sortie covariables :
+\begin{equation}
+  \mathbf{z} = \big[\,\text{GMP}(d_1),\;\text{cov\_branch}\,\big]
+  \;\in\; \mathbb{R}^{B \times 42}
+  \xrightarrow{\text{Linear}(42, N_c)} \hat{y}
+\end{equation}
+
+Le modèle totalise \textbf{113\,566 paramètres}, soit environ le double de
+MCTNet (56\,798), le surcoût provenant principalement du décodeur et de la
+branche covariables.
+
+% ------------------------------------------------------------
+\subsection{Résultats — MCTNetUSkip (sans covariables)}
 
 \begin{table}[H]
 \centering
@@ -225,11 +321,11 @@ MCTNetUSkip  & [résultat] & [résultat] \\
 \toprule
 \textbf{Modèle} & \textbf{Région} & \textbf{OA} & \textbf{Kappa} & \textbf{F1 macro} \\
 \midrule
-MCTNet       & Arkansas   & [résultat] & [résultat] & [résultat] \\
-MCTNetUSkip  & Arkansas   & [résultat] & [résultat] & [résultat] \\
+MCTNet      & Arkansas   & 0.9603 & 0.9504 & 0.9603 \\
+MCTNetUSkip & Arkansas   & 0.9637 & 0.9546 & 0.9640 \\
 \midrule
-MCTNet       & California & [résultat] & [résultat] & [résultat] \\
-MCTNetUSkip  & California & [résultat] & [résultat] & [résultat] \\
+MCTNet      & California & 0.9311 & 0.9166 & 0.9339 \\
+MCTNetUSkip & California & 0.9283 & 0.9133 & 0.9308 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -241,9 +337,91 @@ MCTNetUSkip  & California & [résultat] & [résultat] & [résultat] \\
 %   \label{fig:courbes_uskip}
 % \end{figure}
 
+% ------------------------------------------------------------
+\subsection{Résultats — UNetMCTNetWithCovars : étude d'ablation}
+\label{subsec:ablation_covars}
+
+L'apport de chaque groupe de covariables est évalué par ablation sur sept
+configurations. Les covariables sont : sol (\textit{sol} : pH, carbone
+organique, texture — 3 variables), climat (\textit{clim} : ERA5 36
+pas~$\times$~3 variables = 108) et topographie (\textit{topo} : altitude,
+type de relief — 2 variables).
+
+\begin{table}[H]
+\centering
+\caption{Ablation covariables — Arkansas ($N_c=5$, MCTNet baseline : OA=0.9603)}
+\label{tab:ablation_arkansas}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Configuration} & \textbf{OA} & \textbf{Kappa} & \textbf{F1 macro} \\
+\midrule
+Sol seul             & 0.9701 & 0.9626 & 0.9702 \\
+Climat seul          & 0.9728 & 0.9660 & 0.9729 \\
+Topographie seule    & 0.9756 & 0.9696 & 0.9757 \\
+Climat + Sol         & 0.9769 & 0.9712 & 0.9770 \\
+Climat + Topo        & 0.9745 & 0.9681 & 0.9745 \\
+\textbf{Sol + Topo}  & \textbf{0.9785} & \textbf{0.9731} & \textbf{0.9785} \\
+Tout (sol+clim+topo) & 0.9769 & 0.9712 & 0.9770 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Ablation covariables — California ($N_c=6$, MCTNet baseline : OA=0.9311)}
+\label{tab:ablation_california}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Configuration} & \textbf{OA} & \textbf{Kappa} & \textbf{F1 macro} \\
+\midrule
+Sol seul             & 0.9312 & 0.9158 & 0.9332 \\
+Climat seul          & 0.9316 & 0.9161 & 0.9355 \\
+Topographie seule    & 0.9276 & 0.9112 & 0.9304 \\
+Climat + Sol         & 0.9321 & 0.9167 & 0.9354 \\
+Climat + Topo        & 0.9313 & 0.9159 & 0.9333 \\
+Sol + Topo           & 0.9313 & 0.9158 & 0.9331 \\
+\textbf{Tout (sol+clim+topo)} & \textbf{0.9395} & \textbf{0.9259} & \textbf{0.9421} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ------------------------------------------------------------
 \subsection{Discussion}
 
-[À compléter.]
+\paragraph{MCTNetUSkip.}
+En Arkansas, la réintégration des représentations intermédiaires via les
+connexions skip apporte un gain marginal mais consistant (+0.34 pts OA,
++0.42 pts Kappa) avec \emph{moins} de paramètres que MCTNet ($-5\,956$,
+soit $-10.5$\,\%). Cela confirme que les représentations à haute résolution
+temporelle (Stage 1, $T=36$) encodent des informations phénologiques utiles
+que la seule sortie du Stage 3 ne retient pas.
+
+En Californie, une légère dégradation est observée ($-0.28$ pts OA). Avec
+seulement 6 classes très diversifiées géographiquement (vallées centrale,
+Sacramento, Imperial), la concaténation brute des trois niveaux de skip peut
+introduire du bruit supplémentaire, notamment pour les classes à phénologie
+lente (Almonds, Grapes) dont les caractéristiques discriminantes résident
+davantage dans les représentations compressées.
+
+\paragraph{Apport des covariables.}
+En Arkansas, toutes les configurations apportent un gain substantiel sur MCTNet
+($+0.98$ à $+1.82$ pts OA). La configuration optimale est \textbf{Sol + Topo}
+(OA = 0.9785), ce qui suggère que la texture et le pH des sols, combinés
+à la topographie, sont les indicateurs les plus discriminants pour les cultures
+arkansiennes (soja, riz, coton) fortement liées aux conditions pédologiques
+des plaines alluviales.
+
+En Californie, les gains individuels sont très faibles ($< 0.1$ pt), reflétant
+la plus grande complexité du jeu ($N_c = 6$, disparité géographique). La
+configuration \textbf{Tout} est la seule à dépasser clairement le baseline
+(OA = 0.9395, +0.84 pts), indiquant qu'aucun seul type de covariable ne
+suffit : les cultures californiennes (pistaches, amandes, vigne) nécessitent
+la complémentarité des trois sources.
+
+L'architecture encodeur-décodeur complète (UNetMCTNetWithCovars, 113\,566
+paramètres) montre que doubler la capacité du modèle par rapport à MCTNet
+est justifié dès lors qu'on dispose de covariables multi-sources, mais
+reste excessif pour la série Sentinel-2 seule.
 
 % ============================================================
 \section{Synthèse comparative}
@@ -260,7 +438,7 @@ MCTNetUSkip  & California & [résultat] & [résultat] & [résultat] \\
 MCTNet (baseline) & 0.9603 & 0.9504 & 0.9603 & 56\,798 \\
 GatedMCTNet       & 0.9695 & 0.9618 & 0.9696 & 61\,068 \\
 MCTNet Multiscale & [résultat] & [résultat] & [résultat] & 56\,798 \\
-MCTNetUSkip       & [résultat] & [résultat] & [résultat] & [résultat] \\
+MCTNetUSkip       & 0.9637 & 0.9546 & 0.9640 & 50\,842 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -276,7 +454,7 @@ MCTNetUSkip       & [résultat] & [résultat] & [résultat] & [résultat] \\
 MCTNet (baseline) & 0.9311 & 0.9166 & 0.9339 & 56\,879 \\
 GatedMCTNet       & 0.9237 & 0.9077 & 0.9257 & 61\,149 \\
 MCTNet Multiscale & [résultat] & [résultat] & [résultat] & 56\,879 \\
-MCTNetUSkip       & [résultat] & [résultat] & [résultat] & [résultat] \\
+MCTNetUSkip       & 0.9283 & 0.9133 & 0.9308 & 50\,907 \\
 \bottomrule
 \end{tabular}
 \end{table}
