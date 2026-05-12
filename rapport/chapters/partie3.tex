@@ -1,11 +1,20 @@
 % ============================================================
-%  Partie 3 — Contribution : GatedMCTNet
+%  Partie 3 — Contributions
 % ============================================================
 
-\chapter{Partie 3 — Contribution : GatedMCTNet}
+\chapter{Partie 3 — Contributions}
 \label{chap:partie3}
 
-\section{Motivation}
+Cette partie présente trois contributions indépendantes apportées à MCTNet,
+chacune ciblant un aspect différent de l'architecture : la fusion des branches
+(GatedMCTNet), la résolution temporelle (MCTNet Multiscale), et la
+préservation des représentations intermédiaires (MCTNetUSkip).
+
+% ============================================================
+\section{Contribution 1 — GatedMCTNet : fusion dynamique}
+\label{sec:gated}
+
+\subsection{Motivation}
 
 Dans MCTNet, la fusion CNN-Transformer se fait par simple concaténation :
 les deux branches contribuent toujours à 50/50, indépendamment du contexte.
@@ -21,9 +30,7 @@ le stage :
 \textbf{Idée} : remplacer la fusion fixe par une gate apprise qui pondère
 dynamiquement la contribution de chaque branche en fonction du contenu.
 
-\section{Architecture GatedMCTNet}
-
-\subsection{Bloc GatedCTFusion}
+\subsection{Architecture — Bloc GatedCTFusion}
 
 GatedCTFusion remplace CTFusion à chacun des trois stages. La seule
 modification est l'ajout d'une \textbf{gate} entre la sortie des deux
@@ -56,14 +63,14 @@ branches et leur concaténation.
 La forme de sortie est identique à CTFusion — GatedMCTNet est un remplacement
 transparent ne nécessitant aucune modification du reste du code.
 
-\subsection{Paramètres supplémentaires}
+\subsection{Bilan paramétrique}
 
 La gate $W_g$ ajoute $\text{Linear}(2C, C)$, soit $2C^2 + C$ paramètres
 par stage :
 
 \begin{table}[H]
 \centering
-\caption{Paramètres supplémentaires par stage}
+\caption{Paramètres supplémentaires par stage — GatedMCTNet}
 \label{tab:gate_params}
 \begin{tabular}{lccc}
 \toprule
@@ -79,7 +86,7 @@ Stage 3 & 40 & 3\,240 & 4\,270 \\
 \begin{table}[H]
 \centering
 \caption{Comparaison MCTNet vs GatedMCTNet (Arkansas, $N_c=5$)}
-\label{tab:params_compare}
+\label{tab:params_compare_gated}
 \begin{tabular}{lrr}
 \toprule
 \textbf{Modèle} & \textbf{Paramètres} & \textbf{Différence} \\
@@ -90,30 +97,12 @@ GatedMCTNet  & 61\,068 & +4\,270 (+7.5\%) \\
 \end{tabular}
 \end{table}
 
-\section{Implémentation}
-
-La contribution est implémentée dans [src/ctfusion.py](../Partie\ I/Point\ 5\ ---\ Model\ Implementation/src/ctfusion.py)
-(classe \texttt{GatedCTFusion}) et \texttt{src/mctnet.py} (classe
-\texttt{GatedMCTNet}). L'entraînement utilise le même \texttt{train.py}
-avec le flag \texttt{-{}-model gated}.
-
-Six tests unitaires vérifient :
-\begin{itemize}
-  \item Les formes de sortie aux trois stages
-  \item Le compte exact de paramètres supplémentaires (+210/+820/+3240)
-  \item Les formes de sortie pour Arkansas et California
-  \item La validité des prédictions (\texttt{predict()})
-  \item Les valeurs de la gate $\alpha \in (0, 1)$ (sigmoid)
-\end{itemize}
-
-\section{Résultats}
-
-\subsection{Métriques comparatives}
+\subsection{Résultats}
 
 \begin{table}[H]
 \centering
 \caption{MCTNet vs GatedMCTNet — métriques sur le test set}
-\label{tab:comparaison}
+\label{tab:resultats_gated}
 \begin{tabular}{llccc}
 \toprule
 \textbf{Modèle} & \textbf{Région} & \textbf{OA} & \textbf{Kappa} & \textbf{F1 macro} \\
@@ -127,16 +116,12 @@ GatedMCTNet & California & [résultat] & [résultat] & [résultat] \\
 \end{tabular}
 \end{table}
 
-\subsection{Courbes d'apprentissage}
-
 % \begin{figure}[H]
 %   \centering
-%   \includegraphics[width=\textwidth]{figures/courbes_comparaison.png}
+%   \includegraphics[width=\textwidth]{figures/courbes_gated.png}
 %   \caption{Courbes d'apprentissage — MCTNet vs GatedMCTNet.}
-%   \label{fig:courbes_compare}
+%   \label{fig:courbes_gated}
 % \end{figure}
-
-[À insérer : \texttt{courbes\_comparaison.png} généré par le notebook Colab]
 
 \subsection{Discussion}
 
@@ -147,7 +132,153 @@ conserve la légèreté de MCTNet tout en introduisant une flexibilité de fusio
 
 En Californie (6 classes, jeu d'entraînement plus petit), une tendance au
 surapprentissage est observable sur la branche Transformer, la gate ayant
-besoin de plus d'exemples pour converger vers des poids stables. Ce point
-constitue une piste d'amélioration pour des travaux futurs.
+besoin de plus d'exemples pour converger vers des poids stables.
+
+% ============================================================
+\section{Contribution 2 — MCTNet Multiscale : entraînement deux échelles}
+\label{sec:multiscale}
+
+\subsection{Motivation}
+
+MCTNet traite chaque pixel indépendamment à une seule résolution temporelle
+(36 pas de temps). L'hypothèse ici est qu'exposer le modèle à deux granularités
+temporelles différentes lors de l'entraînement peut améliorer la robustesse
+des représentations apprises et la généralisation.
+
+\subsection{Architecture}
+
+[À compléter — décrire le setup two-scale : sous-échantillonnage de la série
+temporelle, double forward pass ou double jeu de données, partage des poids, etc.]
+
+\subsection{Résultats}
+
+\begin{table}[H]
+\centering
+\caption{MCTNet vs MCTNet Multiscale — métriques sur le test set}
+\label{tab:resultats_multiscale}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Modèle} & \textbf{Région} & \textbf{OA} & \textbf{Kappa} & \textbf{F1 macro} \\
+\midrule
+MCTNet            & Arkansas   & [résultat] & [résultat] & [résultat] \\
+MCTNet Multiscale & Arkansas   & [résultat] & [résultat] & [résultat] \\
+\midrule
+MCTNet            & California & [résultat] & [résultat] & [résultat] \\
+MCTNet Multiscale & California & [résultat] & [résultat] & [résultat] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% \begin{figure}[H]
+%   \centering
+%   \includegraphics[width=\textwidth]{figures/courbes_multiscale.png}
+%   \caption{Courbes d'apprentissage — MCTNet vs MCTNet Multiscale.}
+%   \label{fig:courbes_multiscale}
+% \end{figure}
+
+\subsection{Discussion}
+
+[À compléter.]
+
+% ============================================================
+\section{Contribution 3 — MCTNetUSkip : connexions skip de type U-Net}
+\label{sec:uskip}
+
+\subsection{Motivation}
+
+Dans MCTNet, l'information circule uniquement de façon progressive vers le
+bas de l'encodeur (Stage 1 → 2 → 3). Les représentations à haute résolution
+temporelle du Stage 1 ne sont pas réutilisées lors de la classification. En
+s'inspirant de l'architecture U-Net \cite{ronneberger2015}, des connexions
+skip permettent de propager ces représentations directement vers la sortie,
+préservant les détails fins de la série temporelle.
+
+\subsection{Architecture — MCTNetUSkip}
+
+[À compléter — décrire les connexions skip : quels stages sont connectés,
+comment les sorties intermédiaires sont agrégées (concaténation, addition,
+attention), dimensions résultantes.]
+
+\subsection{Bilan paramétrique}
+
+\begin{table}[H]
+\centering
+\caption{Comparaison MCTNet vs MCTNetUSkip}
+\label{tab:params_uskip}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Modèle} & \textbf{Paramètres} & \textbf{Différence} \\
+\midrule
+MCTNet       & 56\,798 & --- \\
+MCTNetUSkip  & [résultat] & [résultat] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Résultats}
+
+\begin{table}[H]
+\centering
+\caption{MCTNet vs MCTNetUSkip — métriques sur le test set}
+\label{tab:resultats_uskip}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Modèle} & \textbf{Région} & \textbf{OA} & \textbf{Kappa} & \textbf{F1 macro} \\
+\midrule
+MCTNet       & Arkansas   & [résultat] & [résultat] & [résultat] \\
+MCTNetUSkip  & Arkansas   & [résultat] & [résultat] & [résultat] \\
+\midrule
+MCTNet       & California & [résultat] & [résultat] & [résultat] \\
+MCTNetUSkip  & California & [résultat] & [résultat] & [résultat] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% \begin{figure}[H]
+%   \centering
+%   \includegraphics[width=\textwidth]{figures/courbes_uskip.png}
+%   \caption{Courbes d'apprentissage — MCTNet vs MCTNetUSkip.}
+%   \label{fig:courbes_uskip}
+% \end{figure}
+
+\subsection{Discussion}
+
+[À compléter.]
+
+% ============================================================
+\section{Synthèse comparative}
+\label{sec:synthese}
+
+\begin{table}[H]
+\centering
+\caption{Comparaison globale des trois contributions — Arkansas}
+\label{tab:synthese_arkansas}
+\begin{tabular}{lcccr}
+\toprule
+\textbf{Modèle} & \textbf{OA} & \textbf{Kappa} & \textbf{F1 macro} & \textbf{Paramètres} \\
+\midrule
+MCTNet (baseline) & [résultat] & [résultat] & [résultat] & 56\,798 \\
+GatedMCTNet       & [résultat] & [résultat] & [résultat] & 61\,068 \\
+MCTNet Multiscale & [résultat] & [résultat] & [résultat] & 56\,798 \\
+MCTNetUSkip       & [résultat] & [résultat] & [résultat] & [résultat] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Comparaison globale des trois contributions — California}
+\label{tab:synthese_california}
+\begin{tabular}{lcccr}
+\toprule
+\textbf{Modèle} & \textbf{OA} & \textbf{Kappa} & \textbf{F1 macro} & \textbf{Paramètres} \\
+\midrule
+MCTNet (baseline) & [résultat] & [résultat] & [résultat] & 56\,879 \\
+GatedMCTNet       & [résultat] & [résultat] & [résultat] & 61\,149 \\
+MCTNet Multiscale & [résultat] & [résultat] & [résultat] & 56\,879 \\
+MCTNetUSkip       & [résultat] & [résultat] & [résultat] & [résultat] \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \cleardoublepage

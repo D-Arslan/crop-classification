@@ -12,6 +12,39 @@ architecture légère combinant CNN et Transformer pour la classification
 pixel par pixel de cultures agricoles. Avec moins de 57 000 paramètres, il
 atteint des performances comparables aux modèles bien plus lourds.
 
+\section{Données}
+
+\subsection{Acquisition et format}
+
+Les données Sentinel-2 ont été acquises via Google Earth Engine sur deux
+régions agricoles américaines. Chaque pixel est représenté par :
+\begin{itemize}
+  \item \texttt{input1} : $(N,\,10,\,36)$ — réflectances spectrales normalisées
+  \item \texttt{input2} : $(N,\,36)$ — masque de disponibilité (1 = valide)
+  \item \texttt{labels} : $(N,)$ — indice de classe
+\end{itemize}
+
+Les labels proviennent du Cropland Data Layer (CDL) de l'USDA.
+
+\subsection{Répartition des échantillons}
+
+\begin{table}[H]
+\centering
+\caption{Répartition train / val / test}
+\label{tab:splits}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Région} & \textbf{Train} & \textbf{Val} & \textbf{Test} \\
+\midrule
+Arkansas   & 1\,200 & 300 & 8\,523 \\
+California & 1\,440 & 360 & 8\,226 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Les pixels sont échantillonnés dans des \textbf{zones dispersées} à travers
+la région, afin d'éviter l'autocorrélation spatiale entre les splits.
+
 \section{Architecture}
 
 \subsection{Vue d'ensemble}
@@ -77,39 +110,6 @@ Classifier           & 405   & 486 \\
 \end{tabular}
 \end{table}
 
-\section{Données}
-
-\subsection{Acquisition et format}
-
-Les données Sentinel-2 ont été acquises via Google Earth Engine sur deux
-régions agricoles américaines. Chaque pixel est représenté par :
-\begin{itemize}
-  \item \texttt{input1} : $(N,\,10,\,36)$ — réflectances spectrales normalisées
-  \item \texttt{input2} : $(N,\,36)$ — masque de disponibilité (1 = valide)
-  \item \texttt{labels} : $(N,)$ — indice de classe
-\end{itemize}
-
-Les labels proviennent du Cropland Data Layer (CDL) de l'USDA.
-
-\subsection{Répartition des échantillons}
-
-\begin{table}[H]
-\centering
-\caption{Répartition train / val / test}
-\label{tab:splits}
-\begin{tabular}{lrrr}
-\toprule
-\textbf{Région} & \textbf{Train} & \textbf{Val} & \textbf{Test} \\
-\midrule
-Arkansas   & 1\,200 & 300 & 8\,523 \\
-California & 1\,440 & 360 & 8\,226 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Les pixels sont échantillonnés dans des \textbf{zones dispersées} à travers
-la région, afin d'éviter l'autocorrélation spatiale entre les splits.
-
 \section{Protocole d'entraînement}
 
 \begin{table}[H]
@@ -158,11 +158,21 @@ California  & 0.9502 & 0.9313 & --- \\
 \end{tabular}
 \end{table}
 
-% \begin{figure}[H]
-%   \centering
-%   \includegraphics[width=\textwidth]{figures/courbes_mctnet.png}
-%   \caption{Courbes d'apprentissage MCTNet — Arkansas et California.}
-%   \label{fig:courbes_mctnet}
-% \end{figure}
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{figures/loss_arkansas.png}
+    \caption{Arkansas}
+    \label{fig:loss_arkansas}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{figures/loss_california.png}
+    \caption{California}
+    \label{fig:loss_california}
+  \end{subfigure}
+  \caption{Courbes de loss MCTNet — Arkansas et California.}
+  \label{fig:courbes_mctnet}
+\end{figure}
 
 \cleardoublepage
