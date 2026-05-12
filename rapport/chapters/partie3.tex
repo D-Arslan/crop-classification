@@ -146,9 +146,69 @@ temporelles différentes lors de l'entraînement peut améliorer la robustesse
 des représentations apprises et la généralisation.
 
 \subsection{Architecture}
+\label{subsec:ms_archi}
 
-[À compléter — décrire le setup two-scale : sous-échantillonnage de la série
-temporelle, double forward pass ou double jeu de données, partage des poids, etc.]
+La branche CNN de chaque bloc CTFusion est remplacée par un module
+multi-échelle ; toutes les autres composantes (Transformer, ALPE, MaxPool)
+restent strictement identiques à \cite{wang2024}, ce qui garantit que toute
+différence de performance est directement attribuable à cette seule modification.
+
+Le nouveau module exécute trois ResBlocks 1D en parallèle avec des kernels
+$k \in \{3, 7, 15\}$, soit des champs réceptifs de 30, 70 et 150 jours.
+Ce choix est motivé par la phénologie agricole : la floraison est un événement
+court ($\sim$2 semaines, $k{=}3$), la montaison s'étale sur un à deux mois
+($k{=}7$).
+Pour une entrée $\mathbf{x} \in \mathbb{R}^{B \times C \times T}$ :
+
+\begin{equation}
+  \mathbf{h}_k = \text{ReLU}\!\left(
+    \text{BN}\!\left(\text{Conv}^{(2)}_k\!\left(
+      \text{BN}\!\left(\text{Conv}^{(1)}_k(\mathbf{x})\right)
+    \right)\right) + \mathbf{x}
+  \right), \quad k \in \{3,\,7,\,15\}
+\end{equation}
+
+Les trois sorties sont concaténées puis projetées par une convolution $1{\times}1$ :
+
+\begin{equation}
+  \text{MSCNN}(\mathbf{x})
+  = \text{ReLU}\!\left(\text{BN}\!\left(
+      \text{Conv}_{1}\!\left([\mathbf{h}_3;\,\mathbf{h}_7;\,\mathbf{h}_{15}]\right)
+    \right)\right)
+  \in \mathbb{R}^{B \times C \times T}
+\end{equation}
+
+Le bloc CTFusion conserve sa structure :
+
+\begin{equation}
+  \text{CTFusion}(\mathbf{x})
+  = \text{MaxPool}_2\!\left(
+      [\,\text{MSCNN}(\mathbf{x})\;;\;\text{Transformer}(\mathbf{x})\,]
+    \right)
+  \in \mathbb{R}^{B \times 2C \times T/2}
+\end{equation}
+
+\subsection{Bilan paramétrique}
+\label{subsec:ms_params}
+
+\begin{table}[H]
+\centering
+\caption{Comparaison du nombre de paramètres (Arkansas, 5 classes).}
+\label{tab:ms_params}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Modèle} & \textbf{Params CNN} & \textbf{Params Transformer + clf.} & \textbf{Total} \\
+\midrule
+MCTNet \cite{wang2024}  & 12\,880    & 43\,918 & 56\,798  \\
+MCTNet Multiscale       & 112\,280   & 43\,918 & 156\,198 \\
+\midrule
+Différence              & $+$99\,400 & 0       & $+$99\,400 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+L'augmentation est exclusivement localisée dans les branches CNN
+($\times$8,7 pour ce seul composant) ; la partie Transformer reste inchangée.
 
 \subsection{Résultats}
 
@@ -160,11 +220,11 @@ temporelle, double forward pass ou double jeu de données, partage des poids, et
 \toprule
 \textbf{Modèle} & \textbf{Région} & \textbf{OA} & \textbf{Kappa} & \textbf{F1 macro} \\
 \midrule
-MCTNet            & Arkansas   & [résultat] & [résultat] & [résultat] \\
-MCTNet Multiscale & Arkansas   & [résultat] & [résultat] & [résultat] \\
+MCTNet            & Arkansas   & 0.9603 & 0.9504 & 0.9603 \\
+MCTNet Multiscale & Arkansas   & 0.9668 & 0.9585 & 0.9671 \\
 \midrule
-MCTNet            & California & [résultat] & [résultat] & [résultat] \\
-MCTNet Multiscale & California & [résultat] & [résultat] & [résultat] \\
+MCTNet            & California & 0.9311 & 0.9166 & 0.9339 \\
+MCTNet Multiscale & California & 0.9322 & 0.9180 & 0.9349 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -177,8 +237,22 @@ MCTNet Multiscale & California & [résultat] & [résultat] & [résultat] \\
 % \end{figure}
 
 \subsection{Discussion}
+\label{subsec:ms_discussion}
 
-[À compléter.]
+MCTNet Multiscale améliore légèrement la baseline sur les deux régions :
+$+0.65$ points de F1 sur Arkansas (0.9671 vs 0.9603) et $+0.10$ point sur
+California (0.9349 vs 0.9339).
+Les gains sont modestes mais cohérents, ce qui valide l'hypothèse multi-échelle
+sans la survaloriser.
+Les courbes d'entraînement révèlent cependant un comportement instable :
+la loss de validation présente des pics ponctuels marqués (epochs 30--50 et
+75--100), signe d'un surapprentissage partiel lié au triplement des paramètres
+CNN ($56\,798 \to 156\,198$), plus prononcé sur California (validation loss
+stagnant autour de 0.4) que sur Arkansas (redescendant sous 0.2).
+La matrice de confusion Arkansas confirme une classification quasi-parfaite
+sur les classes 1--3 (rappel $\geq 0.98$) ; sur California, la confusion
+principale reste entre les classes 2 et 3 (rappel $0.88$ et $0.89$),
+deux cultures aux dynamiques temporelles proches même à plusieurs échelles.
 
 % ============================================================
 \section{Contribution 3 — MCTNetUSkip : connexions skip et covariables}
@@ -437,7 +511,7 @@ reste excessif pour la série Sentinel-2 seule.
 \midrule
 MCTNet (baseline) & 0.9603 & 0.9504 & 0.9603 & 56\,798 \\
 GatedMCTNet       & 0.9695 & 0.9618 & 0.9696 & 61\,068 \\
-MCTNet Multiscale & [résultat] & [résultat] & [résultat] & 56\,798 \\
+MCTNet Multiscale & 0.9668 & 0.9585 & 0.9671 & 156\,198 \\
 MCTNetUSkip       & 0.9637 & 0.9546 & 0.9640 & 50\,842 \\
 \bottomrule
 \end{tabular}
@@ -453,7 +527,7 @@ MCTNetUSkip       & 0.9637 & 0.9546 & 0.9640 & 50\,842 \\
 \midrule
 MCTNet (baseline) & 0.9311 & 0.9166 & 0.9339 & 56\,879 \\
 GatedMCTNet       & 0.9237 & 0.9077 & 0.9257 & 61\,149 \\
-MCTNet Multiscale & [résultat] & [résultat] & [résultat] & 56\,879 \\
+MCTNet Multiscale & 0.9322 & 0.9180 & 0.9349 & 156\,198 \\
 MCTNetUSkip       & 0.9283 & 0.9133 & 0.9308 & 50\,907 \\
 \bottomrule
 \end{tabular}
