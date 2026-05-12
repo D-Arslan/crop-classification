@@ -1,30 +1,145 @@
 % ============================================================
-%  Partie 1 — Modèle de base : MCTNet
+%  Partie 1 — Reproduction de MCTNet
 % ============================================================
 
-\chapter{Partie 1 — Reproduction de MCTNet}
+\chapter{Partie 1 — Modèle de base : MCTNet}
 \label{chap:partie1}
 
-\section{Présentation de MCTNet}
+% ============================================================
+\section{Revue de littérature}
+\label{sec:litterature}
 
-MCTNet (\textit{Multi-stage CNN-Transformer Network}) \cite{wang2024} est une
-architecture légère combinant CNN et Transformer pour la classification
-pixel par pixel de cultures agricoles. Avec moins de 57 000 paramètres, il
-atteint des performances comparables aux modèles bien plus lourds.
+\subsection{Contexte et problématique}
 
-\section{Données}
+La cartographie des cultures agricoles à grande échelle est un enjeu majeur
+pour la gestion des ressources alimentaires et le suivi environnemental.
+Les images satellitaires multi-temporelles offrent une couverture spatiale
+importante, mais leur exploitation nécessite des modèles capables de traiter
+des séries temporelles bruyantes (nuages, données manquantes) sur de grandes
+surfaces.
 
-\subsection{Acquisition et format}
+\subsection{Analyse du papier MCTNet}
 
-Les données Sentinel-2 ont été acquises via Google Earth Engine sur deux
-régions agricoles américaines. Chaque pixel est représenté par :
+MCTNet (\textit{Multi-stage CNN-Transformer Network}) \cite{wang2024} propose
+une architecture légère combinant CNN et Transformer pour la classification
+pixel par pixel de cultures agricoles à partir de séries temporelles
+Sentinel-2. Les contributions principales du papier sont :
+
 \begin{itemize}
-  \item \texttt{input1} : $(N,\,10,\,36)$ — réflectances spectrales normalisées
-  \item \texttt{input2} : $(N,\,36)$ — masque de disponibilité (1 = valide)
-  \item \texttt{labels} : $(N,)$ — indice de classe
+  \item \textbf{Architecture hybride CNN-Transformer} : un bloc CTFusion traite
+        la série temporelle en deux branches parallèles — une branche CNN pour
+        les motifs locaux, une branche Transformer pour les dépendances
+        long-terme — et fusionne leurs sorties par concaténation.
+  \item \textbf{Légèreté} : moins de 57 000 paramètres, contre plusieurs
+        millions pour les modèles concurrents (TransUNet, Swin Transformer),
+        ce qui rend MCTNet déployable sans GPU haut de gamme.
+  \item \textbf{Gestion des données manquantes} : le module ALPE
+        (\textit{Adaptive Learnable Positional Encoding}) pondère l'encodage
+        positionnel en fonction d'un masque de disponibilité, atténuant
+        l'impact des observations occultées par des nuages.
+  \item \textbf{Performances} : OA de 0.9598 sur Arkansas et 0.9502 sur
+        California, comparables aux modèles nettement plus lourds.
 \end{itemize}
 
-Les labels proviennent du Cropland Data Layer (CDL) de l'USDA.
+\subsection{Positionnement}
+
+Par rapport aux approches existantes, MCTNet se distingue par son ratio
+performance/complexité. Les modèles purement CNN (TempCNN \cite{pelletier2019})
+capturent bien les motifs locaux mais peinent sur les dépendances long-terme.
+Les modèles purement Transformer sont puissants mais coûteux. MCTNet propose
+un compromis efficace en combinant les deux à chaque stage.
+
+% ============================================================
+\section{Acquisition des données}
+\label{sec:acquisition}
+
+\subsection{Source et régions d'étude}
+
+Les données Sentinel-2 ont été acquises via \textbf{Google Earth Engine}
+sur deux régions agricoles américaines :
+
+\begin{itemize}
+  \item \textbf{Arkansas} — état du sud des États-Unis, dominé par des
+        cultures en rotation (Corn, Cotton, Rice, Soybeans). Climat humide
+        subtropical avec une forte couverture nuageuse en hiver.
+  \item \textbf{California} — état de l'ouest, caractérisé par des cultures
+        pérennes (Grapes, Almonds, Pistachios) et irriguées (Rice, Alfalfa).
+        Climat méditerranéen avec une saison sèche marquée.
+\end{itemize}
+
+Les labels de référence proviennent du \textbf{Cropland Data Layer (CDL)}
+de l'USDA, une carte de cultures à 30 m de résolution produite annuellement
+par télédétection et vérifiée sur le terrain.
+
+\subsection{Format des données}
+
+Chaque pixel est décrit par trois tenseurs :
+
+\begin{itemize}
+  \item \texttt{input1} : $(N,\,10,\,36)$ — réflectances spectrales sur les
+        10 bandes Sentinel-2 sélectionnées, normalisées par bande (mean/std
+        calculés sur le train set uniquement).
+  \item \texttt{input2} : $(N,\,36)$ — masque de disponibilité binaire
+        (1 = observation valide, 0 = occultée par nuage ou hors scène).
+  \item \texttt{labels} : $(N,)$ — indice de classe entier.
+\end{itemize}
+
+\subsection{Bandes spectrales}
+
+Les 10 bandes Sentinel-2 retenues couvrent le visible, le proche infrarouge
+et le moyen infrarouge :
+
+\begin{table}[H]
+\centering
+\caption{Bandes Sentinel-2 utilisées}
+\label{tab:bandes}
+\begin{tabular}{llll}
+\toprule
+\textbf{Bande} & \textbf{Nom} & \textbf{Longueur d'onde} & \textbf{Résolution} \\
+\midrule
+B2  & Blue       & 490 nm  & 10 m \\
+B3  & Green      & 560 nm  & 10 m \\
+B4  & Red        & 665 nm  & 10 m \\
+B5  & Red Edge 1 & 705 nm  & 20 m \\
+B6  & Red Edge 2 & 740 nm  & 20 m \\
+B7  & Red Edge 3 & 783 nm  & 20 m \\
+B8  & NIR        & 842 nm  & 10 m \\
+B8A & NIR narrow & 865 nm  & 20 m \\
+B11 & SWIR 1     & 1610 nm & 20 m \\
+B12 & SWIR 2     & 2190 nm & 20 m \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Dimension temporelle}
+
+Chaque série couvre 36 pas de temps correspondant à des composites
+bi-mensuels sur 18 mois (ou mensuels sur 3 ans), permettant de capturer
+l'intégralité du cycle phénologique des cultures.
+
+% ============================================================
+\section{Exploration des données}
+\label{sec:exploration}
+
+\subsection{Classes de cultures}
+
+\begin{table}[H]
+\centering
+\caption{Classes de cultures par région}
+\label{tab:classes}
+\begin{tabular}{llll}
+\toprule
+\textbf{Arkansas} & \textbf{Indice} & \textbf{California} & \textbf{Indice} \\
+\midrule
+Corn     & 0 & Rice       & 0 \\
+Cotton   & 1 & Alfalfa    & 1 \\
+Rice     & 2 & Grapes     & 2 \\
+Soybeans & 3 & Almonds    & 3 \\
+Others   & 4 & Pistachios & 4 \\
+         &   & Others     & 5 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Répartition des échantillons}
 
@@ -42,10 +157,87 @@ California & 1\,440 & 360 & 8\,226 \\
 \end{tabular}
 \end{table}
 
-Les pixels sont échantillonnés dans des \textbf{zones dispersées} à travers
-la région, afin d'éviter l'autocorrélation spatiale entre les splits.
+Les pixels sont échantillonnés dans des \textbf{zones géographiquement
+dispersées} à travers chaque région, afin d'éviter l'autocorrélation spatiale
+entre les splits train et test.
 
-\section{Architecture}
+\subsection{Distribution des classes}
+
+% \begin{figure}[H]
+%   \centering
+%   \includegraphics[width=0.85\textwidth]{figures/class_distribution.png}
+%   \caption{Distribution des classes dans le jeu d'entraînement — Arkansas (gauche) et California (droite).}
+%   \label{fig:class_dist}
+% \end{figure}
+
+[À compléter — figures/class\_distribution.png]
+
+\subsection{Profils phénologiques}
+
+Chaque culture présente une signature temporelle caractéristique dans les
+bandes spectrales. Le Rice en Arkansas montre un pic de réflectance NIR
+concentré sur juillet--août, correspondant à son cycle de croissance rapide.
+Les cultures pérennes (Alfalfa, Grapes en Californie) présentent un signal
+NIR élevé et stable sur toute la saison. Ces différences phénologiques
+constituent l'information discriminante exploitée par MCTNet.
+
+% \begin{figure}[H]
+%   \centering
+%   \includegraphics[width=\textwidth]{figures/timeseries_par_classe.png}
+%   \caption{Séries temporelles moyennes par classe (bande NIR) — Arkansas (haut) et California (bas).}
+%   \label{fig:timeseries}
+% \end{figure}
+
+[À compléter — figures/timeseries\_par\_classe.png]
+
+\subsection{Données manquantes}
+
+La couverture nuageuse génère des gaps dans les séries temporelles,
+encodés dans le masque \texttt{input2}. L'Arkansas, plus humide, présente
+un taux de données manquantes plus élevé en hiver. La California, plus
+sèche, a des séries quasi complètes en été mais dégradées en hiver.
+
+% \begin{figure}[H]
+%   \centering
+%   \includegraphics[width=0.8\textwidth]{figures/mask_analysis.png}
+%   \caption{Taux de données manquantes par pas de temps — Arkansas (bleu) et California (orange).}
+%   \label{fig:mask}
+% \end{figure}
+
+[À compléter — figures/mask\_analysis.png]
+
+% ============================================================
+\section{Prétraitement}
+\label{sec:preprocessing}
+
+\subsection{Filtrage des nuages}
+
+Les observations invalides sont identifiées via le masque SCL
+(\textit{Scene Classification Layer}) de Sentinel-2 et encodées dans
+\texttt{input2}. Aucune interpolation n'est appliquée : les valeurs
+manquantes sont conservées telles quelles, et le module ALPE se charge
+de les atténuer lors du traitement.
+
+\subsection{Normalisation}
+
+Les réflectances sont normalisées par bande :
+
+\begin{equation}
+  \hat{x}_{b,t} = \frac{x_{b,t} - \mu_b}{\sigma_b}
+\end{equation}
+
+où $\mu_b$ et $\sigma_b$ sont calculés \textbf{exclusivement sur le train
+set} et appliqués ensuite à val et test, évitant toute fuite de données.
+
+\subsection{Stratégie d'échantillonnage}
+
+Les pixels d'entraînement sont extraits de zones géographiquement dispersées.
+Cette approche garantit que le modèle généralise à des zones non vues plutôt
+que de mémoriser des structures spatiales locales.
+
+% ============================================================
+\section{Architecture de MCTNet}
+\label{sec:architecture}
 
 \subsection{Vue d'ensemble}
 
@@ -61,8 +253,7 @@ classificateur linéaire :
   \xrightarrow{\text{Linear}} (B,\,N_c)
 \end{equation}
 
-Chaque pixel est décrit par 10 bandes spectrales Sentinel-2 sur 36 pas de
-temps. $N_c = 5$ pour l'Arkansas, $N_c = 6$ pour la Californie.
+$N_c = 5$ pour l'Arkansas, $N_c = 6$ pour la Californie.
 
 \subsection{Bloc CTFusion}
 
@@ -70,10 +261,11 @@ Le bloc CTFusion est l'unité de base répétée trois fois. Il traite la même
 entrée en deux branches parallèles puis fusionne leurs sorties :
 
 \begin{itemize}
-  \item \textbf{Branche CNN} (ResBlock1D) — capte les motifs locaux de la
-        série temporelle (pics phénologiques, transitions).
+  \item \textbf{Branche CNN} (ResBlock1D) — deux convolutions 1D de kernel 3
+        avec connexion résiduelle, capte les motifs locaux de la série
+        temporelle (pics phénologiques, transitions rapides).
   \item \textbf{Branche Transformer} (MHSA, 5 têtes) — modélise les
-        dépendances globales entre pas de temps.
+        dépendances globales entre pas de temps distants.
 \end{itemize}
 
 Les sorties sont concaténées sur la dimension canaux, puis réduites
@@ -85,12 +277,21 @@ temporellement par un MaxPool1D (stride 2) :
   \;:\; (B,C,T) \to (B,\,2C,\,T/2)
 \end{equation}
 
-\subsection{ALPE — gestion des données manquantes}
+\subsection{Module ALPE}
 
 Au Stage 1 uniquement, un module ALPE (\textit{Adaptive Learnable Positional
 Encoding}) pondère l'encodage positionnel du Transformer en fonction du masque
-de disponibilité (\texttt{input2}). Les pas de temps couverts par des nuages
-reçoivent un encodage réduit, limitant leur influence sur l'attention.
+\texttt{input2} :
+
+\begin{equation}
+  \text{PE\_adapté}_t = \text{PE}_t \cdot w_t, \quad
+  w_t = f\!\big(\text{input2}_t,\; \theta_{\text{ALPE}}\big)
+\end{equation}
+
+Les pas de temps couverts par des nuages ($\text{input2}_t = 0$) reçoivent
+un encodage réduit, limitant leur influence sur les scores d'attention. Cette
+approche est plus robuste que l'interpolation car elle n'introduit pas de
+valeurs synthétiques dans les données.
 
 \subsection{Bilan paramétrique}
 
@@ -102,19 +303,24 @@ reçoivent un encodage réduit, limitant leur influence sur l'attention.
 \toprule
 \textbf{Composant} & \textbf{Arkansas ($N_c=5$)} & \textbf{California ($N_c=6$)} \\
 \midrule
-CTFusion Stage 1–3   & \multicolumn{2}{c}{56\,393 (partagé)} \\
-Classifier           & 405   & 486 \\
+CTFusion Stage 1   & \multicolumn{2}{c}{9\,270} \\
+CTFusion Stage 2   & \multicolumn{2}{c}{18\,860} \\
+CTFusion Stage 3   & \multicolumn{2}{c}{28\,263} \\
+ALPE               & \multicolumn{2}{c}{---} \\
+Classifier         & 405 & 486 \\
 \midrule
-\textbf{Total}       & \textbf{56\,798} & \textbf{56\,879} \\
+\textbf{Total}     & \textbf{56\,798} & \textbf{56\,879} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+% ============================================================
 \section{Protocole d'entraînement}
+\label{sec:entrainement}
 
 \begin{table}[H]
 \centering
-\caption{Hyperparamètres (Table 3 de \cite{wang2024})}
+\caption{Hyperparamètres (reproduisant la Table 3 de \cite{wang2024})}
 \label{tab:hyperparams}
 \begin{tabular}{ll}
 \toprule
@@ -129,34 +335,39 @@ Têtes d'attention    & 5 \\
 Kernel Conv1D        & 3 \\
 Dropout              & 0.1 \\
 Early stopping       & patience = 20 \\
-Scheduler            & ReduceLROnPlateau (factor=0.5) \\
+Scheduler            & ReduceLROnPlateau (factor = 0.5) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 Le meilleur modèle est sélectionné selon le \textbf{F1 macro} sur le jeu de
-validation. Les métriques finales (OA, Kappa, F1) sont calculées sur le
-test set avec le meilleur checkpoint.
+validation. Les métriques finales (OA, Kappa, F1 macro) sont calculées sur
+le test set avec le meilleur checkpoint.
 
+% ============================================================
 \section{Résultats}
+\label{sec:resultats_p1}
+
+\subsection{Métriques comparatives}
 
 \begin{table}[H]
 \centering
-\caption{MCTNet — métriques sur le test set}
+\caption{MCTNet reproduit vs résultats originaux}
 \label{tab:resultats_mctnet}
-\begin{tabular}{lccc}
+\begin{tabular}{llccc}
 \toprule
-\textbf{Région} & \textbf{OA} & \textbf{Kappa} & \textbf{F1 macro} \\
+\textbf{Source} & \textbf{Région} & \textbf{OA} & \textbf{Kappa} & \textbf{F1 macro} \\
 \midrule
-Arkansas    & [résultat] & [résultat] & [résultat] \\
-California  & [résultat] & [résultat] & [résultat] \\
+\cite{wang2024}    & Arkansas   & 0.9598 & 0.9421 & --- \\
+Notre reproduction & Arkansas   & [résultat] & [résultat] & [résultat] \\
 \midrule
-\multicolumn{4}{l}{\textit{Référence \cite{wang2024}}} \\
-Arkansas    & 0.9598 & 0.9421 & --- \\
-California  & 0.9502 & 0.9313 & --- \\
+\cite{wang2024}    & California & 0.9502 & 0.9313 & --- \\
+Notre reproduction & California & [résultat] & [résultat] & [résultat] \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\subsection{Courbes d'apprentissage}
 
 \begin{figure}[H]
   \centering
@@ -171,8 +382,13 @@ California  & 0.9502 & 0.9313 & --- \\
     \caption{California}
     \label{fig:loss_california}
   \end{subfigure}
-  \caption{Courbes de loss MCTNet — Arkansas et California.}
+  \caption{Courbes de loss MCTNet — train et validation.}
   \label{fig:courbes_mctnet}
 \end{figure}
+
+\subsection{Discussion}
+
+[À compléter selon les résultats obtenus — écart avec le papier original,
+comportement de la loss, convergence, overfitting éventuel.]
 
 \cleardoublepage
