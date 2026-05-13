@@ -121,31 +121,6 @@ Z4 & Imperial Valley (alfalfa)      & [-115.8, 32.6, -115.2, 33.2] \\
 \end{tabular}
 \end{table}
 
-\subsection{Paramètres de collecte}
-
-\begin{table}[H]
-\centering
-\caption{Paramètres de collecte GEE}
-\label{tab:params_gee}
-\begin{tabular}{lll}
-\toprule
-\textbf{Paramètre} & \textbf{Valeur} & \textbf{Justification} \\
-\midrule
-Satellite        & Sentinel-2 L2A     & Réflectances de surface (corrigées atmosphériquement) \\
-Période          & Année 2021         & Cohérent avec l'article \\
-Fenêtre          & 10 jours           & Composites médianes décadaires \\
-Pas de temps     & 36                 & 365 / 10 $\approx$ 36 \\
-Résolution       & 30\,m              & Cohérente avec le CDL \\
-Filtre nuages    & CLOUDY\_PIXEL\_PERCENTAGE $<$ 20\,\% & Élimination des scènes très nuageuses \\
-Masque pixel     & Bits 10 et 11 de QA60 & Nuages opaques et cirrus \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Les fenêtres sans aucune observation valide reçoivent la valeur 0
-(\textit{unmask(0)}), signalant une donnée manquante exploitée ensuite
-par le module ALPE.
-
 \subsection{Format des données}
 
 Chaque pixel est décrit par trois tenseurs :
@@ -157,33 +132,6 @@ Chaque pixel est décrit par trois tenseurs :
         normalisation : 1 si au moins une bande est non nulle, 0 sinon.
   \item \texttt{labels} : $(N,)$ — indice de classe entier.
 \end{itemize}
-
-\subsection{Bandes spectrales}
-
-Les bandes 1, 9 et 10 (résolution 60\,m) sont exclues. Les \textbf{10 bandes
-retenues} couvrent le visible, les Red Edge, le NIR et le SWIR :
-
-\begin{table}[H]
-\centering
-\caption{Bandes Sentinel-2 utilisées}
-\label{tab:bandes}
-\begin{tabular}{lllll}
-\toprule
-\textbf{Bande} & \textbf{Nom} & \textbf{$\lambda$} & \textbf{Résolution} & \textbf{Information principale} \\
-\midrule
-B2  & Blue       & 490 nm  & 10 m & Couleur, atmosphère \\
-B3  & Green      & 560 nm  & 10 m & Réflexion chlorophylle \\
-B4  & Red        & 665 nm  & 10 m & Absorption chlorophylle \\
-B5  & Red Edge 1 & 705 nm  & 20 m & Stress végétal \\
-B6  & Red Edge 2 & 740 nm  & 20 m & Teneur en chlorophylle \\
-B7  & Red Edge 3 & 783 nm  & 20 m & Structure du couvert \\
-B8  & NIR        & 842 nm  & 10 m & Biomasse, densité végétale \\
-B8A & Red Edge 4 & 865 nm  & 20 m & Santé et vigueur \\
-B11 & SWIR 1     & 1610 nm & 20 m & Teneur en eau \\
-B12 & SWIR 2     & 2190 nm & 20 m & Stress hydrique \\
-\bottomrule
-\end{tabular}
-\end{table}
 
 \subsection{Dimension temporelle}
 
@@ -210,13 +158,13 @@ sa robustesse aux nuages non détectés (valeurs aberrantes) :
 \toprule
 \textbf{Classe} & \textbf{Total} & \textbf{Train} & \textbf{Val} & \textbf{Test} \\
 \midrule
-Soybeans & 4\,677 & 240 & 60 & 4\,377 \\
-Rice     & 2\,423 & 240 & 60 & 2\,123 \\
-Corn     & 1\,522 & 240 & 60 & 1\,222 \\
-Cotton   &   762  & 240 & 60 &   462  \\
-Others   &   616  & 240 & 60 &   316  \\
+Soybeans & 1\,799 & 240 & 60 & 1\,499 \\
+Rice     & 2\,056 & 240 & 60 & 1\,756 \\
+Corn     & 2\,056 & 240 & 60 & 1\,756 \\
+Cotton   & 2\,056 & 240 & 60 & 1\,756 \\
+Others   & 2\,056 & 240 & 60 & 1\,756 \\
 \midrule
-\textbf{Total} & \textbf{10\,000} & \textbf{1\,200} & \textbf{300} & \textbf{8\,500} \\
+\textbf{Total} & \textbf{10\,023} & \textbf{1\,200} & \textbf{300} & \textbf{9\,723} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -229,46 +177,29 @@ Others   &   616  & 240 & 60 &   316  \\
 \toprule
 \textbf{Classe} & \textbf{Total} & \textbf{Train} & \textbf{Val} & \textbf{Test} \\
 \midrule
-Grapes     & 2\,054 & 240 & 60 & 1\,754 \\
-Rice       & 2\,037 & 240 & 60 & 1\,737 \\
-Alfalfa    &   974  & 240 & 60 &   674  \\
-Almonds    &   783  & 240 & 60 &   483  \\
-Pistachios &   640  & 240 & 60 &   340  \\
-Others     & 3\,512 & 240 & 60 & 3\,212 \\
+Grapes     & 1\,680 & 240 & 60 & 1\,380 \\
+Rice       & 1\,126 & 240 & 60 &   826  \\
+Alfalfa    & 1\,930 & 240 & 60 & 1\,630 \\
+Almonds    & 1\,680 & 240 & 60 & 1\,380 \\
+Pistachios & 1\,680 & 240 & 60 & 1\,380 \\
+Others     & 1\,930 & 240 & 60 & 1\,630 \\
 \midrule
-\textbf{Total} & \textbf{10\,000} & \textbf{1\,440} & \textbf{360} & \textbf{8\,200} \\
+\textbf{Total} & \textbf{10\,026} & \textbf{1\,440} & \textbf{360} & \textbf{8\,200} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 La stratégie de partitionnement est \textbf{équilibrée} : 300 pixels par
 classe sont réservés pour train+val (240/60), indépendamment de l'abondance
-naturelle de chaque classe. Le reste — souvent très majoritaire — forme le
-test set, représentatif de la vraie distribution géographique.
+naturelle de chaque classe. Le reste forme le test set, représentatif de la
+vraie distribution géographique.
 
 \subsection{Profils phénologiques (NDVI)}
 
 Chaque culture présente une signature temporelle caractéristique. Le pic
-de NDVI intervient à des moments distincts de l'année :
-
-\begin{table}[H]
-\centering
-\caption{Décalages phénologiques observés — Arkansas}
-\label{tab:phenologie}
-\begin{tabular}{ll}
-\toprule
-\textbf{Culture} & \textbf{Pic NDVI} \\
-\midrule
-Corn     & DOY $\approx$ 170 (mi-juin) \\
-Rice     & DOY $\approx$ 200 (mi-juillet) \\
-Soybeans & DOY $\approx$ 220 (début août) \\
-Cotton   & DOY $\approx$ 240 (fin août) \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Ces décalages phénologiques constituent l'information discriminante
-principale exploitée par MCTNet via sa branche Transformer.
+de NDVI intervient à des moments distincts de l'année. Ces décalages
+phénologiques constituent l'information discriminante principale exploitée
+par MCTNet via sa branche Transformer.
 
 \begin{figure}[H]
   \centering
@@ -443,7 +374,7 @@ Classifier                    & 405 & 486 \\
 Optimiseur           & Adam \\
 Taux d'apprentissage & $10^{-3}$ \\
 Weight decay         & $10^{-4}$ \\
-Batch size           & 32 \\
+Batch size           & 64 \\
 Époques max          & 200 \\
 Têtes d'attention    & 5 \\
 Kernel Conv1D        & 3 \\
@@ -500,6 +431,16 @@ Notre reproduction & California & 0.9311 & 0.9166 & 0.9339 \\
   \label{fig:courbes_mctnet}
 \end{figure}
 
+\subsection{Matrices de confusion}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{figures/confusion_mctnet.png}
+  \caption{Matrices de confusion — MCTNet sur le test set (Arkansas à gauche,
+  California à droite).}
+  \label{fig:confusion_mctnet}
+\end{figure}
+
 \subsection{Discussion}
 
 Sur l'Arkansas, la reproduction est fidèle : notre OA (0.9603) dépasse
@@ -508,21 +449,33 @@ légèrement celle du papier (0.9598), et le Kappa est nettement supérieur
 pipeline de collecte et de prétraitement produit des données de qualité
 comparable, voire légèrement plus propres sur ce jeu.
 
-Sur la Californie, un écart de $-1.9$ points d'OA (0.9311 vs 0.9502)
-est observable. Plusieurs facteurs l'expliquent. D'abord, le jeu
-d'entraînement California comporte 6 classes au lieu de 5, ce qui
-complexifie la tâche à nombre d'exemples équivalent par classe (240).
-Ensuite, les cultures pérennes (Grapes, Almonds, Pistachios) présentent
-des phénologies lentes et partiellement superposées, rendant leur
-discrimination plus sensible à la quantité de données. Enfin, les 8 zones
-de collecte couvrent une région géographiquement plus étendue et climatiquement
-plus hétérogène que l'Arkansas, ce qui introduit davantage de variabilité
-intra-classe.
+La matrice de confusion Arkansas confirme une classification quasi-parfaite
+sur la majorité des classes. Les confusions résiduelles se concentrent entre
+\textbf{Corn} et \textbf{Soybeans}, deux céréales annuelles aux dynamiques
+phénologiques proches (pic NDVI estival décalé de quelques semaines seulement),
+et entre \textbf{Cotton} et \textbf{Others}, la classe \textit{Others}
+regroupant une diversité de cultures qui peuvent localement imiter le profil
+spectral du coton en début de saison.
 
-Les courbes de loss confirment une convergence saine sur les deux régions,
-sans signe d'overfitting majeur : les losses train et validation descendent
-parallèlement jusqu'à l'arrêt précoce (early stopping déclenché vers
-l'époque 60). La légère oscillation de la loss de validation en California
-est cohérente avec la plus grande difficulté de ce jeu.
+Sur la Californie, un écart de $-1.9$ points d'OA (0.9311 vs 0.9502)
+est observable. Plusieurs facteurs l'expliquent : le jeu comporte 6 classes
+au lieu de 5, les cultures pérennes (Grapes, Almonds, Pistachios) présentent
+des phénologies lentes et partiellement superposées, et les 4 zones de
+collecte couvrent une région géographiquement plus étendue et climatiquement
+plus hétérogène que l'Arkansas.
+
+La matrice de confusion California révèle que les principales erreurs
+concernent précisément ces cultures pérennes : \textbf{Grapes},
+\textbf{Almonds} et \textbf{Pistachios} sont partiellement confondues entre
+elles, leurs profils NDVI étant tous caractérisés par une montée lente au
+printemps et un maintien prolongé en été. La classe \textbf{Rice} est en
+revanche très bien discriminée grâce à son pic phénologique tardif et marqué,
+caractéristique du riz irrigué californien.
+
+Les courbes de loss confirment une convergence saine sur les deux régions :
+les losses train et validation descendent parallèlement jusqu'à l'arrêt
+précoce, sans signe d'overfitting majeur. La légère oscillation de la loss
+de validation en Californie est cohérente avec la plus grande difficulté de
+ce jeu.
 
 \cleardoublepage
