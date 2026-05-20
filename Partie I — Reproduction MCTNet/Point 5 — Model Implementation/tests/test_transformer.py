@@ -10,7 +10,6 @@ from src.transformer_alpe import TransformerSubModule
 torch.manual_seed(42)
 B = 4
 
-
 def test_stage1_avec_alpe():
     C, T = 10, 36
     x = torch.randn(B, C, T)
@@ -20,7 +19,6 @@ def test_stage1_avec_alpe():
     assert out.shape == (B, C, T), f"Shape attendue {(B, C, T)}, obtenue {out.shape}"
     print(f"[OK] Stage 1 — Input {x.shape}  Mask {mask.shape}  Output {out.shape}")
 
-
 def test_stage2_sans_alpe():
     C, T = 20, 18
     x = torch.randn(B, C, T)
@@ -29,7 +27,6 @@ def test_stage2_sans_alpe():
     assert out.shape == (B, C, T), f"Shape attendue {(B, C, T)}, obtenue {out.shape}"
     print(f"[OK] Stage 2 — Input {x.shape}  Output {out.shape}")
 
-
 def test_stage3_sans_alpe():
     C, T = 40, 9
     x = torch.randn(B, C, T)
@@ -37,7 +34,6 @@ def test_stage3_sans_alpe():
     out = model(x)
     assert out.shape == (B, C, T), f"Shape attendue {(B, C, T)}, obtenue {out.shape}"
     print(f"[OK] Stage 3 — Input {x.shape}  Output {out.shape}")
-
 
 def test_nombre_parametres():
     s1 = TransformerSubModule(channels=10, seq_len=36, n_head=5, use_alpe=True)
@@ -48,17 +44,15 @@ def test_nombre_parametres():
            + sum(p.numel() for p in s3.parameters()))
     print(f"[OK] Nombre total de paramètres (3 Transformers) : {total:,}")
 
-
 def test_masque_requis_si_alpe():
     """use_alpe=True sans masque doit lever une ValueError."""
     model = TransformerSubModule(channels=10, seq_len=36, n_head=5, use_alpe=True)
     x = torch.randn(B, 10, 36)
     try:
-        model(x)  # pas de masque → doit planter
+        model(x)
         assert False, "Aurait dû lever ValueError"
     except ValueError:
         print("[OK] ValueError levée correctement si masque absent avec use_alpe=True")
-
 
 if __name__ == "__main__":
     print("=" * 60)

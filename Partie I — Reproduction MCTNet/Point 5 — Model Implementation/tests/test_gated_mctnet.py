@@ -6,7 +6,6 @@ import torch
 from src.ctfusion import CTFusion, GatedCTFusion
 from src.mctnet import MCTNet, GatedMCTNet
 
-
 def test_gated_ctfusion_shapes():
     """Vérifie que GatedCTFusion produit les mêmes formes que CTFusion."""
     B = 4
@@ -32,7 +31,6 @@ def test_gated_ctfusion_shapes():
         )
         print(f"  ✔  GatedCTFusion(C={C:2d}, T={T:2d}) → {tuple(out.shape)}")
 
-
 def test_gated_ctfusion_vs_ctfusion_params():
     """GatedCTFusion doit avoir plus de params que CTFusion (gates ajoutées)."""
     configs = [
@@ -50,13 +48,11 @@ def test_gated_ctfusion_vs_ctfusion_params():
         n_gated = sum(p.numel() for p in gated.parameters())
         extra   = n_gated - n_base
 
-        # La gate ajoute Linear(2C, C) : 2C*C + C params
         expected_extra = 2 * C * C + C
         assert extra == expected_extra, (
             f"C={C} : extra params {extra} ≠ attendu {expected_extra}"
         )
         print(f"  ✔  C={C:2d} : CTFusion={n_base:,} | GatedCTFusion={n_gated:,} (+{extra} params gate)")
-
 
 def test_gated_mctnet_shapes():
     """Vérifie les formes de sortie de GatedMCTNet pour Arkansas et California."""
@@ -72,7 +68,6 @@ def test_gated_mctnet_shapes():
         )
         print(f"  ✔  GatedMCTNet {region} : input {tuple(x.shape)} → logits {tuple(logits.shape)}")
 
-
 def test_gated_mctnet_params():
     """GatedMCTNet doit avoir ~4 270 params de plus que MCTNet."""
     for n_classes in [5, 6]:
@@ -83,7 +78,6 @@ def test_gated_mctnet_params():
         n_gated = sum(p.numel() for p in gated.parameters())
         extra   = n_gated - n_base
 
-        # Stage1 : 2*10*10+10=210, Stage2 : 2*20*20+20=820, Stage3 : 2*40*40+40=3240
         expected_extra = 210 + 820 + 3240
         assert extra == expected_extra, (
             f"n_classes={n_classes} : extra={extra} ≠ attendu {expected_extra}"
@@ -92,7 +86,6 @@ def test_gated_mctnet_params():
             f"  ✔  n_classes={n_classes} : MCTNet={n_base:,} | GatedMCTNet={n_gated:,} "
             f"(+{extra} params)"
         )
-
 
 def test_gated_mctnet_predict():
     """predict() doit retourner des indices de classes valides."""
@@ -106,7 +99,6 @@ def test_gated_mctnet_predict():
     assert preds.shape == (B,)
     assert preds.min() >= 0 and preds.max() < n_classes
     print(f"  ✔  predict() → shape {tuple(preds.shape)}, classes ∈ [0, {n_classes-1}]")
-
 
 def test_gate_values():
     """Les valeurs de la gate doivent être dans (0, 1) — vérifie le sigmoid."""
@@ -126,7 +118,6 @@ def test_gate_values():
     assert alpha.shape == (B, C)
     assert alpha.min() > 0 and alpha.max() < 1
     print(f"  ✔  Gate α ∈ ({alpha.min():.3f}, {alpha.max():.3f}) — bien dans (0, 1)")
-
 
 if __name__ == '__main__':
     print("\n=== GatedCTFusion — formes de sortie ===")

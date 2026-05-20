@@ -19,11 +19,6 @@ Entrée/sortie par CTFusion stage :
 import torch
 import torch.nn as nn
 
-
-# ---------------------------------------------------------------------------
-# CNN sub-module — Residual Block 1D
-# ---------------------------------------------------------------------------
-
 class CNNSubModule(nn.Module):
     """
     CNN sub-module du CTFusion stage (MCTNet).
@@ -47,14 +42,14 @@ class CNNSubModule(nn.Module):
     def __init__(self, in_channels: int, kernel_size: int = 3):
         super().__init__()
 
-        padding = kernel_size // 2  # padding = 1 pour kernel = 3 → conserve T
+        padding = kernel_size // 2
 
         self.conv1 = nn.Conv1d(
-            in_channels,    # canaux en entrée  (ex : 10)
-            in_channels,    # canaux en sortie  (ex : 10) — dimension C inchangée
+            in_channels,
+            in_channels,
             kernel_size=kernel_size,
             padding=padding,
-            bias=False,     # inutile car BatchNorm normalise le biais
+            bias=False,
         )
         self.bn1 = nn.BatchNorm1d(in_channels)
 
@@ -77,14 +72,14 @@ class CNNSubModule(nn.Module):
         Returns:
             out : (B, C, T)  — même forme que l'entrée
         """
-        residual = x                        # sauvegarde pour la connexion résiduelle
+        residual = x
 
-        out = self.conv1(x)                 # (B, C, T)
+        out = self.conv1(x)
         out = self.bn1(out)
 
-        out = self.conv2(out)               # (B, C, T)
+        out = self.conv2(out)
         out = self.bn2(out)
 
-        out = self.relu(out + residual)     # connexion résiduelle + activation
+        out = self.relu(out + residual)
 
         return out

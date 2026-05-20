@@ -28,11 +28,6 @@ from sklearn.metrics import accuracy_score, cohen_kappa_score, f1_score
 
 from src.mctnet import MCTNet, GatedMCTNet
 
-
-# ---------------------------------------------------------------------------
-# Configuration — hyperparamètres (Table 3 de l'article)
-# ---------------------------------------------------------------------------
-
 CONFIG = {
     'lr':           0.001,
     'weight_decay': 1e-4,
@@ -42,18 +37,13 @@ CONFIG = {
     'kernel_size':  3,
     'dropout':      0.1,
     'print_every':  10,
-    'patience':     20,   # early stopping
+    'patience':     20,
 }
 
 N_CLASSES = {
     'Arkansas':   5,
     'California': 6,
 }
-
-
-# ---------------------------------------------------------------------------
-# Dataset
-# ---------------------------------------------------------------------------
 
 class CropDataset(Dataset):
     """
@@ -67,11 +57,10 @@ class CropDataset(Dataset):
 
     def __init__(self, data_dir: str, region: str, split: str):
         prefix = os.path.join(data_dir, f'{region}_{split}')
-        self.X    = torch.from_numpy(np.load(f'{prefix}_input1.npy'))  # (N, 10, 36)
-        self.mask = torch.from_numpy(np.load(f'{prefix}_input2.npy'))  # (N, 36)
-        self.y    = torch.from_numpy(np.load(f'{prefix}_labels.npy'))  # (N,)
+        self.X    = torch.from_numpy(np.load(f'{prefix}_input1.npy'))
+        self.mask = torch.from_numpy(np.load(f'{prefix}_input2.npy'))
+        self.y    = torch.from_numpy(np.load(f'{prefix}_labels.npy'))
 
-        # Garantit les bons types même si les fichiers ont été régénérés
         self.X    = self.X.float()
         self.mask = self.mask.float()
         self.y    = self.y.long()
@@ -81,11 +70,6 @@ class CropDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.X[idx], self.mask[idx], self.y[idx]
-
-
-# ---------------------------------------------------------------------------
-# Entraînement — une époque
-# ---------------------------------------------------------------------------
 
 def train_one_epoch(model, loader, criterion, optimizer, device):
     """
@@ -101,7 +85,7 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
         X, mask, y = X.to(device), mask.to(device), y.to(device)
 
         optimizer.zero_grad()
-        logits = model(X, mask)          # (B, N_classes)
+        logits = model(X, mask)
         loss   = criterion(logits, y)
         loss.backward()
         optimizer.step()
@@ -109,11 +93,6 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
         total_loss += loss.item() * len(y)
 
     return total_loss / len(loader.dataset)
-
-
-# ---------------------------------------------------------------------------
-# Évaluation — OA / Kappa / F1
-# ---------------------------------------------------------------------------
 
 def evaluate(model, loader, criterion, device):
     """
@@ -151,11 +130,6 @@ def evaluate(model, loader, criterion, device):
 
     return loss, oa, kappa, f1
 
-
-# ---------------------------------------------------------------------------
-# Main — boucle complète
-# ---------------------------------------------------------------------------
-
 def main(region: str, data_dir: str, model_name: str):
     device    = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     n_classes = N_CLASSES[region]
@@ -167,7 +141,6 @@ def main(region: str, data_dir: str, model_name: str):
     print(f'Data dir : {data_dir}')
     print('=' * 60)
 
-    # --- Données ---
     train_set = CropDataset(data_dir, region, 'train')
     val_set   = CropDataset(data_dir, region, 'val')
     test_set  = CropDataset(data_dir, region, 'test')
@@ -178,7 +151,6 @@ def main(region: str, data_dir: str, model_name: str):
 
     print(f'Donnees : {len(train_set)} train | {len(val_set)} val | {len(test_set)} test')
 
-    # --- Modèle ---
     model_cls = GatedMCTNet if model_name == 'gated' else MCTNet
     model = model_cls(
         n_classes=n_classes,
@@ -197,7 +169,6 @@ def main(region: str, data_dir: str, model_name: str):
         optimizer, mode='min', factor=0.5, patience=10
     )
 
-    # --- Boucle d'entraînement ---
     best_f1        = 0.0
     best_epoch     = 0
     epochs_no_impr = 0
@@ -233,7 +204,6 @@ def main(region: str, data_dir: str, model_name: str):
             print(f'\nEarly stopping a l\'epoch {epoch} (best ep={best_epoch})')
             break
 
-    # --- Évaluation finale sur le test set ---
     print(f'\nChargement meilleur modele (epoch {best_epoch}, val_F1={best_f1:.4f})...')
     model.load_state_dict(torch.load(save_path, map_location=device))
     _, test_oa, test_kappa, test_f1 = evaluate(model, test_loader, criterion, device)
@@ -245,11 +215,6 @@ def main(region: str, data_dir: str, model_name: str):
     print(f'  Kappa : {test_kappa:.4f}')
     print(f'  F1    : {test_f1:.4f}')
     print(f'\nModele sauvegarde : {save_path}')
-
-
-# ---------------------------------------------------------------------------
-# Point d'entrée
-# ---------------------------------------------------------------------------
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Entrainement MCTNet / GatedMCTNet')

@@ -25,11 +25,6 @@ from sklearn.metrics import (
 
 from src.mctnet import MCTNet
 
-
-# ---------------------------------------------------------------------------
-# CONFIGURATION
-# ---------------------------------------------------------------------------
-
 CONFIG = {
     'lr': 0.001,
     'batch_size': 32,
@@ -45,11 +40,6 @@ N_CLASSES = {
     'Arkansas': 5,
     'California': 6,
 }
-
-
-# ---------------------------------------------------------------------------
-# DATASET
-# ---------------------------------------------------------------------------
 
 class CropDataset(Dataset):
 
@@ -79,11 +69,6 @@ class CropDataset(Dataset):
             self.mask[idx],
             self.y[idx]
         )
-
-
-# ---------------------------------------------------------------------------
-# TRAIN ONE EPOCH
-# ---------------------------------------------------------------------------
 
 def train_one_epoch(
     model,
@@ -116,11 +101,6 @@ def train_one_epoch(
         total_loss += loss.item() * len(y)
 
     return total_loss / len(loader.dataset)
-
-
-# ---------------------------------------------------------------------------
-# EVALUATION
-# ---------------------------------------------------------------------------
 
 def evaluate(
     model,
@@ -185,11 +165,6 @@ def evaluate(
 
     return loss, oa, kappa, f1
 
-
-# ---------------------------------------------------------------------------
-# PLOT CURVES
-# ---------------------------------------------------------------------------
-
 def plot_curves(history, region, scale_tag):
 
     epochs = range(1, len(history['train_loss']) + 1)
@@ -200,7 +175,6 @@ def plot_curves(history, region, scale_tag):
         figsize=(22, 5)
     )
 
-    # LOSS
     axes[0].plot(
         epochs,
         history['train_loss'],
@@ -217,7 +191,6 @@ def plot_curves(history, region, scale_tag):
     axes[0].legend()
     axes[0].grid(alpha=0.3)
 
-    # OA
     axes[1].plot(
         epochs,
         history['val_oa']
@@ -227,7 +200,6 @@ def plot_curves(history, region, scale_tag):
     axes[1].set_ylim(0, 1)
     axes[1].grid(alpha=0.3)
 
-    # KAPPA
     axes[2].plot(
         epochs,
         history['val_kappa']
@@ -237,7 +209,6 @@ def plot_curves(history, region, scale_tag):
     axes[2].set_ylim(0, 1)
     axes[2].grid(alpha=0.3)
 
-    # F1
     axes[3].plot(
         epochs,
         history['val_f1']
@@ -260,11 +231,6 @@ def plot_curves(history, region, scale_tag):
     plt.show()
 
     print(f'Courbes sauvegardées : {save_name}')
-
-
-# ---------------------------------------------------------------------------
-# CONFUSION MATRIX
-# ---------------------------------------------------------------------------
 
 def plot_confusion(
     labels,
@@ -304,11 +270,6 @@ def plot_confusion(
 
     print(f'Matrice sauvegardée : {save_name}')
 
-
-# ---------------------------------------------------------------------------
-# MAIN
-# ---------------------------------------------------------------------------
-
 def main(region: str, data_dir: str):
 
     device = torch.device(
@@ -317,7 +278,6 @@ def main(region: str, data_dir: str):
 
     n_classes = N_CLASSES[region]
 
-    # Détection scale
     if 'scale20' in data_dir:
 
         scale_tag = 'scale20'
@@ -337,10 +297,6 @@ def main(region: str, data_dir: str):
     print(f'Device : {device}')
     print(f'Data dir : {data_dir}')
     print('=' * 60)
-
-    # ----------------------------------------------------------------------
-    # DATASETS
-    # ----------------------------------------------------------------------
 
     train_set = CropDataset(
         data_dir,
@@ -385,10 +341,6 @@ def main(region: str, data_dir: str):
         f'{len(test_set)} test'
     )
 
-    # ----------------------------------------------------------------------
-    # MODEL
-    # ----------------------------------------------------------------------
-
     model = MCTNet(
         n_classes=n_classes,
         n_head=CONFIG['n_head'],
@@ -410,10 +362,6 @@ def main(region: str, data_dir: str):
         lr=CONFIG['lr']
     )
 
-    # ----------------------------------------------------------------------
-    # HISTORY
-    # ----------------------------------------------------------------------
-
     history = {
         'train_loss': [],
         'val_loss': [],
@@ -421,10 +369,6 @@ def main(region: str, data_dir: str):
         'val_kappa': [],
         'val_f1': [],
     }
-
-    # ----------------------------------------------------------------------
-    # EARLY STOPPING
-    # ----------------------------------------------------------------------
 
     es_patience = CONFIG.get(
         'es_patience',
@@ -435,10 +379,6 @@ def main(region: str, data_dir: str):
 
     best_val_loss = float('inf')
 
-    # ----------------------------------------------------------------------
-    # TRAIN LOOP
-    # ----------------------------------------------------------------------
-
     best_f1 = 0.0
     best_epoch = 0
 
@@ -446,7 +386,6 @@ def main(region: str, data_dir: str):
 
     for epoch in range(1, CONFIG['epochs'] + 1):
 
-        # TRAIN
         train_loss = train_one_epoch(
             model,
             train_loader,
@@ -455,7 +394,6 @@ def main(region: str, data_dir: str):
             device,
         )
 
-        # VALIDATION
         val_loss, val_oa, val_kappa, val_f1 = evaluate(
             model,
             val_loader,
@@ -463,14 +401,12 @@ def main(region: str, data_dir: str):
             device,
         )
 
-        # HISTORY
         history['train_loss'].append(train_loss)
         history['val_loss'].append(val_loss)
         history['val_oa'].append(val_oa)
         history['val_kappa'].append(val_kappa)
         history['val_f1'].append(val_f1)
 
-        # SAVE BEST MODEL
         if val_f1 > best_f1:
 
             best_f1 = val_f1
@@ -480,10 +416,6 @@ def main(region: str, data_dir: str):
                 model.state_dict(),
                 save_path
             )
-
-        # ------------------------------------------------------------------
-        # EARLY STOPPING
-        # ------------------------------------------------------------------
 
         if val_loss < best_val_loss - 1e-4:
 
@@ -505,7 +437,6 @@ def main(region: str, data_dir: str):
 
                 break
 
-        # PRINT
         if epoch % CONFIG['print_every'] == 0 or epoch == 1:
 
             elapsed = time.time() - t0
@@ -520,10 +451,6 @@ def main(region: str, data_dir: str):
                 f"| best_F1={best_f1:.4f} "
                 f"| {elapsed:.0f}s"
             )
-
-    # ----------------------------------------------------------------------
-    # LOAD BEST MODEL
-    # ----------------------------------------------------------------------
 
     print(
         f'\nChargement du meilleur modèle '
@@ -552,10 +479,6 @@ def main(region: str, data_dir: str):
         return_preds=True,
     )
 
-    # ----------------------------------------------------------------------
-    # RESULTS
-    # ----------------------------------------------------------------------
-
     print('\n' + '=' * 60)
 
     print(f'RESULTATS FINAUX — {region}')
@@ -567,10 +490,6 @@ def main(region: str, data_dir: str):
     print(f'F1     : {test_f1:.4f}')
 
     print(f'\nModèle sauvegardé : {save_path}')
-
-    # ----------------------------------------------------------------------
-    # PLOTS
-    # ----------------------------------------------------------------------
 
     plot_curves(
         history,
@@ -584,11 +503,6 @@ def main(region: str, data_dir: str):
         region,
         scale_tag,
     )
-
-
-# ---------------------------------------------------------------------------
-# ENTRY POINT
-# ---------------------------------------------------------------------------
 
 if __name__ == '__main__':
 

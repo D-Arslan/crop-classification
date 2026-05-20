@@ -10,7 +10,6 @@ from src.mctnet import MCTNet
 torch.manual_seed(42)
 B = 4
 
-
 def test_arkansas():
     """Arkansas : 5 classes — sortie (B, 5)"""
     x    = torch.randn(B, 10, 36)
@@ -20,7 +19,6 @@ def test_arkansas():
     assert logits.shape == (B, 5), f"Attendu {(B, 5)}, obtenu {logits.shape}"
     print(f"[OK] Arkansas  — Input {tuple(x.shape)} -> Logits {tuple(logits.shape)}")
 
-
 def test_california():
     """Californie : 6 classes — sortie (B, 6)"""
     x    = torch.randn(B, 10, 36)
@@ -29,7 +27,6 @@ def test_california():
     logits = model(x, mask)
     assert logits.shape == (B, 6), f"Attendu {(B, 6)}, obtenu {logits.shape}"
     print(f"[OK] California — Input {tuple(x.shape)} -> Logits {tuple(logits.shape)}")
-
 
 def test_shapes_intermediaires():
     """Vérifie les shapes après chaque stage."""
@@ -53,7 +50,6 @@ def test_shapes_intermediaires():
     print(f"     Stage 3 : {tuple(out3.shape)}")
     print(f"     GMP     : {tuple(gmp.shape)}")
 
-
 def test_predict():
     """predict() retourne des indices de classe valides."""
     x    = torch.randn(B, 10, 36)
@@ -63,7 +59,6 @@ def test_predict():
     assert preds.shape == (B,), f"Attendu ({B},), obtenu {preds.shape}"
     assert preds.min() >= 0 and preds.max() <= 4, f"Classes hors [0,4] : {preds}"
     print(f"[OK] predict() -> {preds.tolist()}  (classes dans [0, 4])")
-
 
 def test_nombre_parametres():
     """
@@ -76,12 +71,11 @@ def test_nombre_parametres():
     total_cal = sum(p.numel() for p in model_cal.parameters())
     print(f"[OK] Parametres Arkansas   : {total_ark:,}  (article Table 6 : 55 059)")
     print(f"[OK] Parametres Californie : {total_cal:,}")
-    # Alerte si on s'éloigne trop de la cible article
+
     assert abs(total_ark - 55059) < 10000, (
         f"Trop loin de la cible article (55 059) : {total_ark:,} params. "
         f"Verifier l'architecture."
     )
-
 
 if __name__ == "__main__":
     print("=" * 60)

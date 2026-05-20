@@ -21,8 +21,6 @@ from src.transformer_alpe import TransformerSubModule
 
 from src.cnn_submodule import MSCNNSubModule
 
-
-
 class CTFusion(nn.Module):
     """
     Bloc CTFusion — unité de base répétée 3 fois dans MCTNet.
@@ -71,8 +69,6 @@ class CTFusion(nn.Module):
             dropout=dropout,
         )
 
-        # MaxPool1d — conforme Figure 3 de l'article
-        # kernel_size=2, stride=2 : divise T par 2
         self.pool = nn.MaxPool1d(kernel_size=2, stride=2)
 
     def forward(
@@ -86,14 +82,12 @@ class CTFusion(nn.Module):
         Returns:
             out  : (B, 2C, T//2)
         """
-        # CNN et Transformer en parallèle sur la même entrée x
-        cnn_out = self.cnn(x)                    # (B, C, T)
-        tr_out  = self.transformer(x, mask)      # (B, C, T)
 
-        # Concaténation sur la dimension canaux
-        fused = torch.cat([cnn_out, tr_out], dim=1)   # (B, 2C, T)
+        cnn_out = self.cnn(x)
+        tr_out  = self.transformer(x, mask)
 
-        # Réduction temporelle — MaxPool conforme Figure 3
-        out = self.pool(fused)                   # (B, 2C, T//2)
+        fused = torch.cat([cnn_out, tr_out], dim=1)
+
+        out = self.pool(fused)
 
         return out

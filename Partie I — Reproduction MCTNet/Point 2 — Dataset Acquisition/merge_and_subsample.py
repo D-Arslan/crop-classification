@@ -3,9 +3,6 @@ import numpy as np
 
 np.random.seed(42)
 
-# ============================================================
-# ARKANSAS : fusionner 5 zones, sous-échantillonner à 10 000
-# ============================================================
 ark_files = [
     'Arkansas_Z1_final.csv',
     'Arkansas_Z2_final.csv',
@@ -31,9 +28,6 @@ for lab, name in label_map_ark.items():
 ark_sampled.to_csv('Arkansas_10k.csv', index=False)
 print("\n-> Fichier sauvegardé : Arkansas_10k.csv")
 
-# ============================================================
-# CALIFORNIA : fusionner 8 zones, sous-échantillonner à 10 000
-# ============================================================
 cal_files = [
     'California_Z1_final.csv',
     'California_Z2_final.csv',

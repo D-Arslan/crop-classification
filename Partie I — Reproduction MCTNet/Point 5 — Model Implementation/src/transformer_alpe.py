@@ -22,11 +22,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
-# ---------------------------------------------------------------------------
-# Utilitaire : encodage positionnel sinusoïdal classique
-# ---------------------------------------------------------------------------
-
 def sinusoidal_pe(seq_len: int, d_model: int, device=None) -> torch.Tensor:
     """
     Retourne la matrice d'encodage positionnel sinusoïdal.
@@ -46,14 +41,9 @@ def sinusoidal_pe(seq_len: int, d_model: int, device=None) -> torch.Tensor:
         * (-math.log(10000.0) / d_model)
     )
     pe[:, 0::2] = torch.sin(position * div_term)
-    # Pour d_model impair, les indices 1::2 peuvent avoir une dimension < div_term
+
     pe[:, 1::2] = torch.cos(position * div_term[: d_model // 2])
-    return pe  # (T, C)
-
-
-# ---------------------------------------------------------------------------
-# ECA — Efficient Channel Attention (Wang et al., 2020)
-# ---------------------------------------------------------------------------
+    return pe
 
 class ECA(nn.Module):
     """
@@ -67,9 +57,9 @@ class ECA(nn.Module):
 
     def __init__(self, channels: int, gamma: int = 2, b: int = 1):
         super().__init__()
-        # Taille de kernel adaptative : k = odd(log2(C)/gamma + b/gamma)
+
         t = int(abs(math.log2(channels) / gamma + b / gamma))
-        k = t if t % 2 else t + 1  # force impair
+        k = t if t % 2 else t + 1
         self.avg_pool = nn.AdaptiveAvgPool1d(1)
         self.conv = nn.Conv1d(1, 1, kernel_size=k, padding=k // 2, bias=False)
         self.sigmoid = nn.Sigmoid()
@@ -81,19 +71,14 @@ class ECA(nn.Module):
         Returns:
             out : (B, C, T)  — x pondéré par l'attention canal
         """
-        # Global average pooling sur T → (B, C, 1)
+
         y = self.avg_pool(x)
-        # Conv1D sur la dimension canal (vue comme séquence de longueur C)
-        y = y.squeeze(-1).unsqueeze(1)   # (B, 1, C)
-        y = self.conv(y)                 # (B, 1, C)
+
+        y = y.squeeze(-1).unsqueeze(1)
+        y = self.conv(y)
         y = self.sigmoid(y)
-        y = y.squeeze(1).unsqueeze(-1)   # (B, C, 1)
+        y = y.squeeze(1).unsqueeze(-1)
         return x * y.expand_as(x)
-
-
-# ---------------------------------------------------------------------------
-# ALPE — Adaptive Learnable Positional Encoding
-# ---------------------------------------------------------------------------
 
 class ALPE(nn.Module):
     """
@@ -119,10 +104,8 @@ class ALPE(nn.Module):
         self.channels = channels
         self.seq_len = seq_len
 
-        # PE pré-calculé une fois, stocké comme buffer (non entraînable,
-        # suit automatiquement le device avec .to() / .cuda())
         pe = sinusoidal_pe(seq_len, channels)
-        self.register_buffer('pe', pe)  # (T, C)
+        self.register_buffer('pe', pe)
 
         padding = kernel_size // 2
         self.conv = nn.Conv1d(
@@ -146,31 +129,20 @@ class ALPE(nn.Module):
         """
         B = x.shape[0]
 
-        # 1. Encodage positionnel sinusoïdal → (T, C)  [pré-calculé dans __init__]
         pe = self.pe
 
-        # 2. Masquage : met à 0 les positions temporelles manquantes
-        #    mask : (B, T) → (B, 1, T) pour broadcast sur C
-        mask_bc = mask.unsqueeze(1).float()       # (B, 1, T)
-        #    pe : (T, C) → (C, T) → (1, C, T) pour broadcast sur B
-        pe_bct = pe.T.unsqueeze(0)                # (1, C, T)
-        masked_pe = pe_bct * mask_bc              # (B, C, T)
+        mask_bc = mask.unsqueeze(1).float()
 
-        # 3. Conv1D sur la dimension temporelle
-        out = self.conv(masked_pe)                # (B, C, T)
+        pe_bct = pe.T.unsqueeze(0)
+        masked_pe = pe_bct * mask_bc
+
+        out = self.conv(masked_pe)
         out = self.bn(out)
         out = F.relu(out)
 
-        # 4. ECA — attention inter-canaux
-        out = self.eca(out)                       # (B, C, T)
+        out = self.eca(out)
 
-        # 5. Addition résiduelle à x
         return x + out
-
-
-# ---------------------------------------------------------------------------
-# Transformer sub-module
-# ---------------------------------------------------------------------------
 
 class TransformerSubModule(nn.Module):
     """
@@ -201,12 +173,9 @@ class TransformerSubModule(nn.Module):
         super().__init__()
         self.use_alpe = use_alpe
 
-        # ALPE — uniquement pour le 1er CTFusion stage
         if use_alpe:
             self.alpe = ALPE(channels, seq_len, kernel_size)
 
-        # Multi-Head Self-Attention
-        # PyTorch attend (T, B, C) ou (B, T, C) avec batch_first=True
         self.attn = nn.MultiheadAttention(
             embed_dim=channels,
             num_heads=n_head,
@@ -215,11 +184,6 @@ class TransformerSubModule(nn.Module):
         )
         self.norm1 = nn.LayerNorm(channels)
 
-        # Feed Forward Network (FFN)
-        # L'article ne précise pas la dim cachée explicitement.
-        # ffn_dim = 8×C donne 56 798 params (Arkansas), le plus proche de la
-        # cible article de 55 059 (Table 6). Ecart résiduel ~1 739 params,
-        # probablement dû à de légères différences dans l'ALPE ou les BN.
         ffn_dim = 8 * channels
         self.ffn = nn.Sequential(
             nn.Linear(channels, ffn_dim),
@@ -243,24 +207,18 @@ class TransformerSubModule(nn.Module):
         """
         B, C, T = x.shape
 
-        # --- ALPE (1er stage seulement) ---
         if self.use_alpe:
             if mask is None:
                 raise ValueError("Le masque est requis quand use_alpe=True")
-            x = self.alpe(x, mask)          # (B, C, T)
+            x = self.alpe(x, mask)
 
-        # Reformat pour MultiheadAttention : (B, T, C)
-        x_t = x.permute(0, 2, 1)           # (B, T, C)
+        x_t = x.permute(0, 2, 1)
 
-        # --- Multi-Head Self-Attention + Add & Norm ---
         attn_out, _ = self.attn(x_t, x_t, x_t)
-        x_t = self.norm1(x_t + attn_out)   # Add & Norm
+        x_t = self.norm1(x_t + attn_out)
 
-        # --- Feed Forward + Add & Norm ---
         ffn_out = self.ffn(x_t)
-        x_t = self.norm2(x_t + ffn_out)    # Add & Norm
+        x_t = self.norm2(x_t + ffn_out)
 
-        # Retour au format (B, C, T)
         out = x_t.permute(0, 2, 1)
         return out
-

@@ -21,7 +21,6 @@ import torch.nn as nn
 from src.cnn_submodule import CNNSubModule
 from src.transformer_alpe import TransformerSubModule
 
-
 class CTFusion(nn.Module):
     """
     Bloc CTFusion — unité de base répétée 3 fois dans MCTNet.
@@ -73,8 +72,6 @@ class CTFusion(nn.Module):
             dropout=dropout,
         )
 
-        # MaxPool1d — conforme Figure 3 de l'article
-        # kernel_size=2, stride=2 : divise T par 2
         self.pool = nn.MaxPool1d(kernel_size=2, stride=2)
 
     def forward(
@@ -88,18 +85,15 @@ class CTFusion(nn.Module):
         Returns:
             out  : (B, 2C, T//2)
         """
-        # CNN et Transformer en parallèle sur la même entrée x
-        cnn_out = self.cnn(x)                    # (B, C, T)
-        tr_out  = self.transformer(x, mask)      # (B, C, T)
 
-        # Concaténation sur la dimension canaux
-        fused = torch.cat([cnn_out, tr_out], dim=1)   # (B, 2C, T)
+        cnn_out = self.cnn(x)
+        tr_out  = self.transformer(x, mask)
 
-        # Réduction temporelle — MaxPool conforme Figure 3
-        out = self.pool(fused)                   # (B, 2C, T//2)
+        fused = torch.cat([cnn_out, tr_out], dim=1)
+
+        out = self.pool(fused)
 
         return out
-
 
 class GatedCTFusion(nn.Module):
     """
@@ -168,9 +162,6 @@ class GatedCTFusion(nn.Module):
             dropout=dropout,
         )
 
-        # Gate : contexte global (2C) → poids par canal (C)
-        # Entrée : moyenne temporelle de cat([cnn_out, tr_out]) → (B, 2C)
-        # Sortie : α ∈ (0,1)^C — un poids par canal CNN
         self.gate_fc = nn.Linear(2 * in_channels, in_channels)
 
         self.pool = nn.MaxPool1d(kernel_size=2, stride=2)
@@ -186,19 +177,16 @@ class GatedCTFusion(nn.Module):
         Returns:
             out  : (B, 2C, T//2)
         """
-        cnn_out = self.cnn(x)               # (B, C, T)
-        tr_out  = self.transformer(x, mask) # (B, C, T)
+        cnn_out = self.cnn(x)
+        tr_out  = self.transformer(x, mask)
 
-        # Contexte global : moyenne temporelle sur les deux sorties
-        context = torch.cat([cnn_out, tr_out], dim=1).mean(dim=2)  # (B, 2C)
+        context = torch.cat([cnn_out, tr_out], dim=1).mean(dim=2)
 
-        # Gate : α par canal, appris depuis le contexte
-        alpha = torch.sigmoid(self.gate_fc(context))        # (B, C)
-        alpha = alpha.unsqueeze(-1)                         # (B, C, 1) — broadcast sur T
+        alpha = torch.sigmoid(self.gate_fc(context))
+        alpha = alpha.unsqueeze(-1)
 
-        # Fusion pondérée : α·CNN + (1-α)·Transformer, concaténés
         fused = torch.cat(
-            [alpha * cnn_out, (1 - alpha) * tr_out], dim=1 # (B, 2C, T)
+            [alpha * cnn_out, (1 - alpha) * tr_out], dim=1
         )
 
-        return self.pool(fused)                             # (B, 2C, T//2)
+        return self.pool(fused)

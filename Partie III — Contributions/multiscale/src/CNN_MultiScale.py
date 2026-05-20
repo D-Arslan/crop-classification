@@ -1,8 +1,6 @@
-# cnn_submodule.py  — version MSCTNet multi-échelle
 
 import torch
 import torch.nn as nn
-
 
 class MSCNNSubModule(nn.Module):
     """
@@ -23,13 +21,10 @@ class MSCNNSubModule(nn.Module):
     def __init__(self, in_channels: int):
         super().__init__()
 
-        # Une branche ResBlock par échelle temporelle
         self.branch3  = self._make_branch(in_channels, kernel_size=3)
         self.branch7  = self._make_branch(in_channels, kernel_size=7)
         self.branch15 = self._make_branch(in_channels, kernel_size=15)
 
-        # Conv 1×1 : fusionne les 3 branches et revient à C canaux
-        # kernel_size=1 → ne touche pas la dimension temporelle T
         self.proj = nn.Sequential(
             nn.Conv1d(in_channels * 3, in_channels, kernel_size=1, bias=False),
             nn.BatchNorm1d(in_channels),
@@ -53,13 +48,11 @@ class MSCNNSubModule(nn.Module):
         Returns:
             out : (B, C, T)
         """
-        # Les 3 branches voient la même entrée x
-        out3  = torch.relu(self.branch3(x)  + x)   # ResBlock k=3
-        out7  = torch.relu(self.branch7(x)  + x)   # ResBlock k=7
-        out15 = torch.relu(self.branch15(x) + x)   # ResBlock k=15
 
-        # Concaténation : (B, 3C, T)
+        out3  = torch.relu(self.branch3(x)  + x)
+        out7  = torch.relu(self.branch7(x)  + x)
+        out15 = torch.relu(self.branch15(x) + x)
+
         fused = torch.cat([out3, out7, out15], dim=1)
 
-        # Projection vers (B, C, T)
         return self.proj(fused)

@@ -22,7 +22,6 @@ import torch.nn as nn
 
 from src.ctfusion import CTFusion
 
-
 class MCTNet(nn.Module):
     """
     MCTNet — Multi-stage CNN-Transformer Network.
@@ -50,29 +49,24 @@ class MCTNet(nn.Module):
     ):
         super().__init__()
 
-        # 3 CTFusion stages
-        # Stage 1 : (B, 10, 36) -> (B, 20, 18)  — avec ALPE
         self.stage1 = CTFusion(
             in_channels=10, seq_len=36,
             n_head=n_head, kernel_size=kernel_size,
             use_alpe=True, dropout=dropout,
         )
-        # Stage 2 : (B, 20, 18) -> (B, 40, 9)
+
         self.stage2 = CTFusion(
             in_channels=20, seq_len=18,
             n_head=n_head, kernel_size=kernel_size,
             use_alpe=False, dropout=dropout,
         )
-        # Stage 3 : (B, 40, 9) -> (B, 80, 4)
+
         self.stage3 = CTFusion(
             in_channels=40, seq_len=9,
             n_head=n_head, kernel_size=kernel_size,
             use_alpe=False, dropout=dropout,
         )
 
-        # MLP Classifier (Section 2.3.2)
-        # "a linear layer with a Softmax activation"
-        # Softmax absent ici — intégré dans CrossEntropyLoss en training
         self.classifier = nn.Linear(80, n_classes)
 
     def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
@@ -84,15 +78,13 @@ class MCTNet(nn.Module):
         Returns:
             logits : (B, N_classes)
         """
-        # 3 CTFusion stages
-        out = self.stage1(x, mask)   # (B, 20, 18)
-        out = self.stage2(out)       # (B, 40,  9)
-        out = self.stage3(out)       # (B, 80,  4)
 
-        # Global Max Pooling : (B, 80, 4) -> (B, 80)
-        out = out.max(dim=2).values  # max sur la dimension temporelle
+        out = self.stage1(x, mask)
+        out = self.stage2(out)
+        out = self.stage3(out)
 
-        # MLP Classifier : (B, 80) -> (B, N_classes)
+        out = out.max(dim=2).values
+
         logits = self.classifier(out)
 
         return logits
