@@ -55,15 +55,16 @@ crop-classification/
 └── Partie III — Contributions/            ← Partie 3 de l'énoncé : 3 contributions
     ├── README.md
     ├── gated/           ← Contribution 1 : GatedMCTNet (fusion dynamique)
-    │   ├── notebooks/   (GatedMCTNet.ipynb, train_colab.ipynb)
+    │   ├── notebooks/   (GatedMCTNet.ipynb — entraînement MCTNet vs GatedMCTNet)
     │   └── models/      (best_Arkansas_gated.pth, best_California_gated.pth)
+    │   NOTE : code Python de GatedMCTNet dans Partie I/Point 5/src/{mctnet,ctfusion}.py
     ├── multiscale/      ← Contribution 2 : MCTNet Multiscale
     │   ├── src/         (CNN_MultiScale.py, ctfusion_MultiScale.py, ...)
     │   ├── notebooks/   (MCTNetMultiscale.ipynb)
     │   ├── docs/        (rapport_ctfusion_multiscale.md)
     │   └── results/     (figures confusion + courbes)
     ├── uskip/           ← Contribution 3 V1 : MCTNetUSkip (skip connections légers)
-    │   └── notebooks/   (MCTNetUSkip.ipynb — à ajouter)
+    │   └── notebooks/   (MCTNetUSkip.ipynb — auto-contenu)
     ├── unet/            ← Contribution 3 V2 : UNetMCTNetWithCovars (encodeur-décodeur + covariables)
     │   └── notebooks/   (UNetMCTNetWithCovars.ipynb)
     └── docs/            (idees_partie3.md — idées initiales)

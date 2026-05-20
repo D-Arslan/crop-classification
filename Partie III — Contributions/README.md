@@ -33,9 +33,13 @@ Partie III — Contributions/
 │
 ├── gated/                                        ← Contribution 1 : GatedMCTNet
 │   ├── notebooks/
-│   │   ├── GatedMCTNet.ipynb                     ← architecture + entraînement
-│   │   └── train_colab.ipynb                     ← script utilitaire Colab
+│   │   └── GatedMCTNet.ipynb                     ← entraînement MCTNet vs GatedMCTNet (importe les classes depuis Partie I/Point 5/src/)
 │   └── models/                                   ← best_*.pth (non versionnés, voir Drive)
+│
+│   NOTE : les définitions Python `GatedMCTNet` (mctnet.py) et `GatedCTFusion`
+│   (ctfusion.py) vivent dans `Partie I — Reproduction MCTNet/Point 5 — Model
+│   Implementation/src/` car elles ont été ajoutées en extension du code de la
+│   Partie 1. Le notebook ici ne contient que l'entraînement et la comparaison.
 │
 ├── multiscale/                                   ← Contribution 2 : MCTNet Multiscale
 │   ├── src/
@@ -56,7 +60,7 @@ Partie III — Contributions/
 │
 ├── uskip/                                        ← Contribution 3 V1 : MCTNetUSkip
 │   └── notebooks/
-│       └── MCTNetUSkip.ipynb                     ← À AJOUTER (notebook local, non pushé)
+│       └── MCTNetUSkip.ipynb                     ← auto-contenu (définit CTFusionSkip + MCTNetUSkip + entraîne)
 │
 └── unet/                                         ← Contribution 3 V2 : UNetMCTNetWithCovars
     └── notebooks/
