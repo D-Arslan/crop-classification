@@ -1,6 +1,8 @@
 # RÉSUMÉ DU PROJET — Deep Learning for Crop Classification
 ## M1 SII — USTHB — 2025/2026
 
+> **Statut final : ✅ Projet livré.** Ce document est figé tel qu'il était pendant le développement et conservé comme historique technique de la Partie 1. Pour les résultats finaux et les Parties 2 et 3, voir `rapport/chapters/*.tex` et le `README.md` racine.
+
 ---
 
 ## 0. Navigation rapide
