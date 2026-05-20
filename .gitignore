@@ -7,6 +7,9 @@ data/
 *.docx
 *.pdf
 
+# Archives compressées (à part celles dans archive/)
+*.zip
+
 # Python
 __pycache__/
 *.py[cod]
@@ -28,3 +31,10 @@ Thumbs.db
 
 # VS Code
 .vs/
+
+# === Overrides : on versionne le contenu de archive/ malgré les règles ci-dessus ===
+# (PDF compilé + zip livré + brouillons historiques)
+!archive/
+!archive/**
+
+# Note : les modèles entraînés (.pth) restent ignorés. Ils sont partagés via Google Drive.

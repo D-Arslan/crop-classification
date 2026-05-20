@@ -1,0 +1,371 @@
+% ============================================================
+%  PARTIE 2 — Intégration des Covariables Environnementales
+%  Version corrigée et complète
+% ============================================================
+
+\chapter{Partie 2 — Intégration de covariables environnementales}
+
+\section{Introduction}
+L'objectif de cette seconde phase est de pallier les limites de la discrimination
+purement spectrale en intégrant des données exogènes. La Partie~1 a établi un
+pipeline de classification basé exclusivement sur les séries temporelles Sentinel-2.
+La Partie~2 enrichit ce cadre en adjoignant trois groupes de covariables
+environnementales~: climatiques (ERA5), pédologiques (OpenLandMap) et
+topographiques (ETOPO1/ALOS). L'objectif est double~: (i) mesurer l'apport de
+chaque groupe de covariables via une ablation study systématique, et (ii) valider
+la généralisation du modèle sur les deux régions géographiques étudiées en Partie~1.
+
+% ============================================================
+\section{Présentation et justification des covariables}
+
+Sept covariables environnementales ont été retenues, structurées en trois catégories.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Catégorie} & \textbf{Covariable} & \textbf{Source} & \textbf{Unité / Format} \\ \hline
+\multirow{3}{*}{\textbf{Pédologie (Sol)}}
+  & pH (\texttt{ph\_b0})               & OpenLandMap & pH réel (÷10) \\ \cline{2-4}
+  & Carbone Organique (\texttt{oc\_b0}) & OpenLandMap & g/kg (÷5)     \\ \cline{2-4}
+  & Texture (\texttt{texture\_b0})      & OpenLandMap & Classe USDA (1--12) \\ \hline
+\multirow{2}{*}{\textbf{Topographie}}
+  & Élévation (\texttt{elevation})      & ETOPO1 (NOAA) & Mètres \\ \cline{2-4}
+  & Modelé (\texttt{landforms})         & ALOS (CSP/ERGo) & Catégoriel entier \\ \hline
+\multirow{3}{*}{\textbf{Climat}}
+  & Température moyenne (\texttt{T\_c}) & ERA5 Daily & °C \\ \cline{2-4}
+  & Précipitations (\texttt{P\_mm})     & ERA5 Daily & mm \\ \cline{2-4}
+  & Humidité Relative (\texttt{RH})     & ERA5 Daily & \% \\ \hline
+\end{tabular}
+\caption{Récapitulatif des covariables environnementales intégrées au modèle.}
+\label{tab:covariables}
+\end{table}
+
+\subsection{Justification scientifique}
+
+\textbf{1. Propriétés du sol (\texttt{soil})~:} Le pH, le carbone organique et la
+texture sont retenus pour leur rôle déterminant dans l'aptitude des terres agricoles.
+La cartographie du carbone organique constitue un indicateur clé de la santé des
+sols~\cite{ou2024}. Ces variables imposent des contraintes biophysiques directes~:
+le riz tolère des sols argileux acides là où le soja nécessite des sols neutres~\cite{tufail2025}.
+
+\textbf{2. Variables climatiques (\texttt{clim})~:} La température, les précipitations
+et l'humidité relative pilotent la phénologie des cultures. Ces facteurs dictent les
+cycles de croissance et influencent directement la réponse spectrale captée par
+Sentinel-2~\cite{wang2024}. L'humidité, étroitement liée aux précipitations, est
+par ailleurs un facteur critique pour la modélisation par réseaux de neurones~\cite{jiao2025}.
+
+\textbf{3. Topographie (\texttt{topo})~:} L'élévation et les modelés du terrain
+permettent de distinguer les contextes de drainage et les microclimats locaux
+(zones de bas-fonds \textit{vs} plateaux), essentiels pour la précision des cartes
+de cultures à grande échelle~\cite{adrah2025}.
+
+\section{Exploration des données}
+
+\subsection{Distribution des covariables statiques par région}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{Figure_6.png}
+        \caption{Arkansas}
+        \label{fig:cov_arkansas}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{Figure_7.png}
+        \caption{California}
+        \label{fig:cov_california}
+    \end{subfigure}
+    \caption{Distribution des covariables statiques (pH, carbone organique, texture USDA, élévation et landforms) par classe de culture pour les états d'Arkansas et de Californie.}
+    \label{fig:covariables}
+\end{figure}
+
+\subsubsection*{Arkansas (Figure~\ref{fig:cov_arkansas})}
+
+Les cinq cultures analysées en Arkansas (maïs, coton, riz, soja, autres) présentent des profils pédologiques relativement homogènes. Le pH varie entre 5{,}5 et 6{,}5 pour la majorité des classes, traduisant des sols légèrement acides typiques des plaines alluviales. Le carbone organique est faible pour toutes les cultures (médiane $\approx 0{,}4$--$0{,}6$~g/kg~$\div$5), avec peu de dispersion. La texture USDA est dominée par des valeurs autour de 7--8, correspondant à des limons argileux, avec une distribution quasi identique entre classes. L'élévation est globalement basse et homogène (65--95~m), ce qui reflète la topographie plane du delta du Mississippi. Les \textit{landforms} montrent peu de variabilité inter-classes (25--35), confirmant un terrain peu accidenté.
+
+\subsubsection*{Californie (Figure~\ref{fig:cov_california})}
+
+La Californie présente une plus grande hétérogénéité entre classes de culture. Le pH est plus élevé (7{,}0--8{,}0), reflétant des sols plus alcalins caractéristiques des vallées irriguées. Le carbone organique reste faible mais avec davantage de valeurs aberrantes à la hausse, notamment pour la luzerne (\textit{Alfalfa}) et la catégorie \textit{Others}. La texture USDA est très variable selon les cultures~: l'alfafa affiche une médiane élevée ($\approx 7$) tandis que les \textit{Others} couvrent tout le spectre. L'élévation est nettement plus dispersée (de $-50$ à $+200$~m), traduisant la diversité topographique de l'État entre plaines côtières et vallées intérieures. Les \textit{landforms} sont comparables entre classes ($\approx 30$--$35$), avec une dispersion modérée.
+
+\medskip
+\noindent\textbf{Synthèse.} Ces distributions suggèrent que les covariables statiques ont un pouvoir discriminant limité en Arkansas en raison de l'homogénéité des conditions pédoclimatiques, alors qu'en Californie, l'élévation et la texture constituent des variables potentiellement plus informatives pour la classification des cultures.
+% ============================================================
+\section{Prétraitement des covariables}
+
+\subsection{Extraction et conversions d'unités}
+
+Les colonnes climatiques sont détectées dynamiquement dans le CSV par préfixe~:
+\texttt{T\_c\_*} (température), \texttt{P\_mm\_*} (précipitations), \texttt{RH\_*}
+(humidité relative), ce qui produit $36 \times 3 = 108$ dimensions pour les variables
+climatiques agrégées sur des fenêtres de 10~jours. Les colonnes statiques
+\texttt{ph\_b0}, \texttt{oc\_b0}, \texttt{texture\_b0}, \texttt{elevation} et
+\texttt{landforms} sont extraites par nom.
+
+Deux conversions d'unités physiques \textbf{fixes} sont appliquées avant toute
+normalisation statistique~:
+
+\begin{itemize}
+    \item \textbf{pH du sol} (\texttt{ph\_b0})~: les valeurs brutes OpenLandMap
+    sont encodées en pH $\times 10$ (entiers). La division par 10 ramène à l'unité
+    réelle (plage $\approx 4$--$8$)~:
+    \[
+        \texttt{ph\_b0} \leftarrow \frac{\texttt{ph\_b0}}{10}
+    \]
+    \item \textbf{Carbone organique} (\texttt{oc\_b0})~: les valeurs brutes sont
+    stockées en décigrammes par kilogramme (dg/kg). La division par 5 les convertit
+    en g/kg, unité agropédologique standard~:
+    \[
+        \texttt{oc\_b0} \leftarrow \frac{\texttt{oc\_b0}}{5}
+    \]
+\end{itemize}
+
+Ces divisions sont des \textbf{constantes physiques fixes}, appliquées uniformément
+avant le split. Elles ne dépendent d'aucune statistique apprise sur les données et
+ne constituent donc pas une fuite de données (\textit{data leak}).
+
+Le vecteur de covariables complet résulte de la concaténation des trois groupes~:
+\[
+    \mathbf{c} = \left[\,\mathbf{c}_{\text{clim}} \;\|\; \mathbf{s}_{\text{sol}}
+    \;\|\; \mathbf{s}_{\text{topo}}\,\right] \in \mathbb{R}^{113}
+    \quad (108 + 3 + 2)
+\]
+
+Sept configurations sont évaluées dans l'ablation study~: \texttt{soil} ($K=3$),
+\texttt{clim} ($K=108$), \texttt{topo} ($K=2$), \texttt{clim\_soil} ($K=111$),
+\texttt{clim\_topo} ($K=110$), \texttt{soil\_topo} ($K=5$) et \texttt{all} ($K=113$).
+
+\subsection{Stratégie de split et normalisation}
+\label{sec:split_norm}
+
+Un soin particulier est apporté à l'absence de fuite de données (\textit{data leak}).
+Le pipeline suit strictement l'ordre suivant~:
+
+\begin{enumerate}
+    \item \textbf{Split sur données brutes.} Pour chaque classe,
+    $\min(300, |\mathcal{C}|)$ individus sont sélectionnés aléatoirement (graine fixée
+    à 42), puis répartis en train~(80\,\%) et val~(20\,\%). Les individus restants
+    constituent le jeu de test.
+    \item \textbf{Fit du \texttt{StandardScaler} sur le train uniquement.}
+    \[
+        \hat{c}_k = \frac{c_k - \mu_k^{\text{train}}}{\sigma_k^{\text{train}}}
+    \]
+    où $\mu_k^{\text{train}}$ et $\sigma_k^{\text{train}}$ sont estimés
+    \textbf{exclusivement} sur les données d'entraînement.
+    \item \textbf{Transform appliqué sur val et test.} Le même scaler est appliqué
+    sans re-fit, ce qui peut induire une légère dérive de la moyenne ($\neq 0$) sur
+    ces sous-ensembles — dérive attendue et sans biais.
+    \item \textbf{Sauvegarde du scaler.} L'objet \texttt{StandardScaler} fitté est
+    sérialisé en \texttt{.pkl} pour permettre une inférence future sans recalcul.
+\end{enumerate}
+
+Cette procédure garantit que les statistiques de normalisation ne sont jamais
+contaminées par les données de validation ou de test.
+
+\subsection{Fichiers de sortie}
+
+Le prétraitement produit, par région et par split (\texttt{train}/\texttt{val}/\texttt{test}),
+l'ensemble de fichiers \texttt{.npy} suivant~:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\hline
+\textbf{Fichier} & \textbf{Forme} & \textbf{Description} \\
+\hline
+\texttt{*\_input1.npy}             & $(N, 10, 36)$ & Bandes S2 normalisées ($\div 10\,000$) \\
+\texttt{*\_input2.npy}             & $(N, 36)$     & Masque données manquantes $\{0,1\}$ \\
+\texttt{*\_covars\_all.npy}        & $(N, 113)$    & Toutes covariables (z-score) \\
+\texttt{*\_covars\_clim.npy}       & $(N, 108)$    & Covariables climatiques seules \\
+\texttt{*\_covars\_soil.npy}       & $(N, 3)$      & Covariables pédologiques seules \\
+\texttt{*\_covars\_topo.npy}       & $(N, 2)$      & Covariables topographiques seules \\
+\texttt{*\_covars\_clim\_soil.npy} & $(N, 111)$    & Climat + sol \\
+\texttt{*\_covars\_clim\_topo.npy} & $(N, 110)$    & Climat + topographie \\
+\texttt{*\_covars\_soil\_topo.npy} & $(N, 5)$      & Sol + topographie \\
+\texttt{*\_labels.npy}             & $(N,)$        & Étiquettes de classe \\
+\texttt{*\_covar\_scaler.pkl}      & —             & StandardScaler (fitté sur train) \\
+\hline
+\end{tabular}
+\caption{Fichiers \texttt{.npy} générés par le pipeline de prétraitement.}
+\label{tab:npy_files}
+\end{table}
+
+% ============================================================
+\section{Architecture MCTNetWithCovars}
+
+\subsection{Branche Sentinel-2}
+
+La branche Sentinel-2 est identique à MCTNet (Partie~1)~: trois blocs CTFusion
+enchaînés suivis d'un Global Max Pooling produisent un vecteur de représentation
+$\mathbf{f}_{S2} \in \mathbb{R}^{80}$~:
+\[
+    (B, 10, 36)
+    \xrightarrow{\text{Stage 1}} (B, 20, 18)
+    \xrightarrow{\text{Stage 2}} (B, 40, 9)
+    \xrightarrow{\text{Stage 3}} (B, 80, 4)
+    \xrightarrow{\text{GMP}} (B, 80)
+\]
+
+\subsection{Branche covariables}
+
+La nouveauté architecturale est l'ajout d'une branche covariables parallèle~:
+\[
+    \mathbf{f}_{\text{cov}} =
+    \text{Dropout}\!\left(\text{ReLU}\!\left(W_c\,\mathbf{c} + b_c\right)\right)
+    \in \mathbb{R}^{32}
+\]
+où $\mathbf{c} \in \mathbb{R}^{K}$ est le vecteur de covariables normalisées
+($K \in \{2, 3, 5, 108, 110, 111, 113\}$ selon la configuration d'ablation) et
+\texttt{cov\_hidden} $= 32$.
+
+\subsection{Fusion et classification}
+
+Les deux représentations sont concaténées et projetées vers les logits~:
+\[
+    \hat{\mathbf{y}} = W_{\text{cls}}\!\left[\mathbf{f}_{S2} \;\|\;
+    \mathbf{f}_{\text{cov}}\right] + b_{\text{cls}} \in \mathbb{R}^{C}
+\]
+avec $W_{\text{cls}} \in \mathbb{R}^{C \times 112}$ ($80 + 32 = 112$).
+
+% ============================================================
+\section{Étude d'ablation des covariables environnementales}
+
+L'entraînement est conduit de façon systématique sur les 7 configurations de
+covariables et les 2 régions, soit $7 \times 2 = 14$ runs indépendants. Le modèle
+de référence correspond à MCTNet sans covariables, dont les résultats sont rappelés
+depuis la Partie~1 (OA\,=\,0.9603 Arkansas, OA\,=\,0.9311 Californie).
+
+\begin{table}[H]
+\centering
+\caption{Étude d'ablation des covariables environnementales.}
+\label{tab:ablation_covariables}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Région} & \textbf{Groupe} & \textbf{OA} & \textbf{Kappa} & \textbf{F1 macro} \\
+\midrule
+Arkansas & MCTNet (baseline) & 0.9603 & 0.9504 & 0.9603 \\
+Arkansas & \texttt{soil}      & 0.9775 & 0.9719 & 0.9776 \\
+Arkansas & \texttt{clim}      & 0.9713 & 0.9641 & 0.9713 \\
+Arkansas & \texttt{topo}      & 0.9716 & 0.9646 & 0.9717 \\
+Arkansas & \texttt{clim\_soil}  & 0.9751 & 0.9688 & 0.9751 \\
+Arkansas & \texttt{clim\_topo}  & 0.9726 & 0.9657 & 0.9726 \\
+Arkansas & \texttt{soil\_topo}  & 0.9699 & 0.9624 & 0.9700 \\
+Arkansas & \texttt{all}       & 0.9772 & 0.9715 & 0.9772 \\
+\midrule
+California & MCTNet (baseline) & 0.9311 & 0.9166 & 0.9339 \\
+California & \texttt{soil}      & 0.9326 & 0.9174 & 0.9348 \\
+California & \texttt{clim}      & 0.9370 & 0.9227 & 0.9396 \\
+California & \texttt{topo}      & 0.9298 & 0.9139 & 0.9330 \\
+California & \texttt{clim\_soil}  & 0.9360 & 0.9216 & 0.9389 \\
+California & \texttt{clim\_topo}  & 0.9368 & 0.9226 & 0.9394 \\
+California & \texttt{soil\_topo}  & 0.9270 & 0.9105 & 0.9303 \\
+California & \texttt{all}       & 0.9357 & 0.9213 & 0.9372 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Covariables pédologiques (\texttt{soil})}
+
+Les covariables pédologiques produisent les meilleurs résultats sur l'Arkansas~:
+l'OA atteint 0.9775 contre 0.9603 pour le modèle de base, soit un gain de +1.72
+points. Le Kappa progresse de 0.9504 à 0.9719 et le F1 macro atteint 0.9776.
+
+Ces résultats s'expliquent par le fait que les cultures dominantes de l'Arkansas
+(riz, maïs, coton) sont fortement liées aux caractéristiques hydriques et minérales
+des sols. Sur la Californie, le gain est plus modeste (OA\,=\,0.9326)~: la diversité
+géographique et la présence de cultures pérennes réduisent l'impact direct des
+variables pédologiques.
+
+\subsection{Covariables climatiques (\texttt{clim})}
+
+Les variables climatiques améliorent les performances sur les deux régions. Sur
+l'Arkansas, l'OA atteint 0.9713~; la Californie obtient son meilleur résultat avec
+cette configuration (OA\,=\,0.9370, Kappa\,=\,0.9227, F1\,=\,0.9396). Ce résultat
+suggère que les conditions climatiques apportent une information complémentaire
+particulièrement utile pour les cultures californiennes, dont les cycles phénologiques
+dépendent fortement des conditions thermiques et hydriques saisonnières.
+
+\subsection{Covariables topographiques (\texttt{topo})}
+
+Les variables topographiques améliorent légèrement les performances sur l'Arkansas
+(OA\,=\,0.9716). En revanche, sur la Californie, l'OA descend à 0.9298, légèrement
+en dessous du modèle de base, ce qui suggère que le relief seul ne constitue pas une
+information suffisamment discriminante et peut introduire du bruit dans l'apprentissage.
+
+\subsection{Combinaisons de covariables}
+
+\paragraph{\texttt{clim\_soil}.}
+La combinaison des variables climatiques et pédologiques donne des résultats
+compétitifs sur les deux régions (Arkansas~: 0.9751~; Californie~: 0.9360). Ces
+deux types de covariables sont complémentaires~: les variables climatiques capturent
+les conditions saisonnières, tandis que les variables pédologiques décrivent le
+contexte physique local.
+
+\paragraph{\texttt{clim\_topo}.}
+Cette combinaison améliore les performances par rapport au modèle de base
+(Arkansas~: 0.9726~; Californie~: 0.9368). Les variables climatiques compensent
+les limites des variables topographiques seules.
+
+\paragraph{\texttt{soil\_topo}.}
+Cette combinaison produit des résultats plus faibles que les autres configurations
+hybrides. Sur la Californie, l'OA descend à 0.9270, en dessous du modèle de base,
+ce qui indique que la topographie peut introduire une redondance ou du bruit en
+l'absence d'information climatique.
+
+\paragraph{Ensemble complet (\texttt{all}).}
+L'utilisation simultanée de toutes les covariables donne des performances très élevées
+sur l'Arkansas (OA\,=\,0.9772), très proches du meilleur résultat obtenu avec
+\texttt{soil} seul. Sur la Californie, l'OA atteint 0.9357, supérieure au modèle de
+base mais légèrement inférieure à la configuration \texttt{clim}. Cela montre que
+l'ajout d'un trop grand nombre de covariables n'apporte pas nécessairement un gain
+supplémentaire et peut augmenter la complexité de l'apprentissage.
+
+\subsection{Analyse des courbes d'apprentissage}
+
+Les courbes d'apprentissage des modèles avec covariables présentent un comportement
+globalement similaire à celui observé en Partie~1. Sur l'Arkansas, la loss de
+validation descend régulièrement avec un écart modéré par rapport à la loss
+d'entraînement~; un léger surapprentissage apparaît en fin d'entraînement, sans
+affecter significativement les métriques finales. Sur la Californie, les oscillations
+de la loss de validation sont plus prononcées et le phénomène d'overfitting est plus
+marqué, cohérent avec la plus grande variabilité intra-classe de ce jeu
+(6 classes, cultures pérennes, région géographiquement étendue).
+
+L'augmentation de la dimension d'entrée liée aux covariables (jusqu'à 113
+dimensions supplémentaires) accroît la complexité de l'espace de représentation,
+ce qui peut rendre l'apprentissage plus difficile avec un nombre d'échantillons
+d'entraînement limité (240 par classe). En Californie, certaines covariables
+peuvent apporter du bruit ou des informations redondantes, favorisant ainsi le
+surapprentissage.
+
+% ============================================================
+% Références bibliographiques
+% ============================================================
+\begin{thebibliography}{9}
+
+\bibitem{wang2024}
+Wang, Z. et al. (2024). \textit{A lightweight CNN-Transformer network (MCTNet)
+for pixel-based crop mapping using time-series Sentinel-2}.
+Computers and Electronics in Agriculture.
+
+\bibitem{tufail2025}
+Tufail, R. et al. (2025). \textit{Deep Learning Applications for Crop Mapping
+Using Multi-Temporal Sentinel-2 Data}. Remote Sensing.
+
+\bibitem{jiao2025}
+Jiao, X. et al. (2025). \textit{Multi-Layer Soil Moisture Profiling Based on
+BKA-CNN}. Agronomy.
+
+\bibitem{adrah2025}
+Adrah, E. et al. (2025). \textit{Integrating GEDI, Sentinel-2, and Sentinel-1
+for tree crops mapping}. Remote Sensing of Environment.
+
+\bibitem{ou2024}
+Ou, G. et al. (2024). \textit{Improving soil organic carbon mapping in farmlands
+using machine learning}. Environmental Sciences Europe.
+
+\end{thebibliography}

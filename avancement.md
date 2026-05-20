@@ -1,6 +1,8 @@
 # Avancement — Deep Learning for Crop Classification
 ## M1 SII — USTHB — 2025/2026
 
+> **Statut final : ✅ Projet livré.** Ce document est figé et conservé comme historique de travail. La structure actuelle du repo est décrite dans le `README.md` principal.
+
 **Article** : "A lightweight CNN-Transformer network for pixel-based crop mapping using time-series Sentinel-2 imagery" — Wang et al., 2024
 
 ---
@@ -23,7 +25,9 @@
 | 2 | Dataset Acquisition | Équipe | ✅ Terminé |
 | 3 | Data Exploration | Équipe | ✅ Terminé |
 | 4 | Data Preprocessing | Sarah | ✅ Terminé |
-| 5 | Model Implementation | Arslan + Tesnime | ⏳ En cours (entraînement à lancer) |
+| 5 | Model Implementation | Arslan + Tesnime | ✅ Terminé |
+| 6 | Partie 2 — Covariables environnementales | Tesnime + Sarah | ✅ Terminé |
+| 7 | Partie 3 — Contributions (GatedMCTNet, Multiscale, MCTNetUSkip/UNet) | Arslan + Tesnime | ✅ Terminé |
 
 ---
 

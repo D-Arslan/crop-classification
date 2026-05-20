@@ -1,18 +1,20 @@
-# Crop Classification — MCTNet
+# Deep Learning for Crop Classification
 ## M1 SII — USTHB — 2025/2026
 
-Reproduction de l'article :
+**Statut : ✅ Projet livré (rapport remis)**
+
+Article de référence :
 > Wang et al., 2024 — *"A lightweight CNN-Transformer network for pixel-based crop mapping using time-series Sentinel-2 imagery"*, Computers and Electronics in Agriculture
 
 ---
 
 ## Équipe
 
-| Membre | Rôle |
-|--------|------|
-| Arslan | ALPE + Transformer sub-module |
-| Tesnime | CNN sub-module |
-| Sarah | Data Preprocessing |
+| Membre | Rôle principal |
+|--------|---------------|
+| Arslan | Partie 1 : ALPE + Transformer + assemblage MCTNet + train.py · Partie 3 : GatedMCTNet, MCTNetUSkip, UNetMCTNetWithCovars |
+| Tesnime | Partie 1 : CNN sub-module · Partie 2 : MCTNetWithCovars · Partie 3 : MCTNet Multiscale |
+| Sarah | Partie 1 : Data Preprocessing · Partie 2 : preprocessing covariables environnementales |
 
 ---
 
@@ -20,26 +22,51 @@ Reproduction de l'article :
 
 ```
 crop-classification/
-├── avancement.md                          ← état d'avancement + workflow Git
-├── Partie I/
-│   ├── resume.md                          ← documentation technique complète
+├── README.md                              ← ce fichier
+├── enonce_du_projet.md                    ← énoncé original du prof
+├── avancement.md                          ← état d'avancement (figé, projet livré)
+├── rapport/                               ← rapport LaTeX (source de vérité)
+│   ├── main.tex
+│   ├── chapters/{intro,partie1,partie2,partie3,conclusion}.tex
+│   ├── figures/
+│   └── references.bib
+├── archive/                               ← rapport compilé + zip livré + brouillons
+├── data/                                  ← données (non versionnées, voir plus bas)
+│
+├── Partie I — Reproduction MCTNet/        ← Partie 1 de l'énoncé
+│   ├── resume.md
 │   ├── Point 1 — Literature Review/
-│   ├── Point 2 — Dataset Acquisition/     ← scripts GEE + merge Python
-│   ├── Point 3 — Data Exploration/        ← notebook d'exploration
-│   ├── Point 4 — Data Preprocessing/      ← notebook preprocessing
+│   ├── Point 2 — Dataset Acquisition/
+│   ├── Point 3 — Data Exploration/
+│   ├── Point 4 — Data Preprocessing/
 │   └── Point 5 — Model Implementation/
-│       ├── src/                           ← modules PyTorch
-│       │   └── transformer_alpe.py
-│       └── tests/                         ← tests par module
-│           └── test_transformer.py
-```
-
----
-
-## Prérequis
-
-```bash
-pip install torch numpy pandas scikit-learn matplotlib
+│       ├── src/         (transformer_alpe, cnn_submodule, ctfusion, mctnet)
+│       ├── tests/
+│       ├── docs/        (doc_*.md, point5.md)
+│       ├── models/      (best_*.pth — non versionnés, voir Drive)
+│       └── train.py
+│
+├── Partie II — Covariables Environnementales/   ← Partie 2 de l'énoncé
+│   ├── README.md
+│   ├── data/            (preprocessing_Part2.ipynb)
+│   ├── src/             (MCTNetWithCovars.ipynb)
+│   └── docs/            (Part2_Climat_Pipeline.md, covariables_par_culture.md, etc.)
+│
+└── Partie III — Contributions/            ← Partie 3 de l'énoncé : 3 contributions
+    ├── README.md
+    ├── gated/           ← Contribution 1 : GatedMCTNet (fusion dynamique)
+    │   ├── notebooks/   (GatedMCTNet.ipynb, train_colab.ipynb)
+    │   └── models/      (best_Arkansas_gated.pth, best_California_gated.pth)
+    ├── multiscale/      ← Contribution 2 : MCTNet Multiscale
+    │   ├── src/         (CNN_MultiScale.py, ctfusion_MultiScale.py, ...)
+    │   ├── notebooks/   (MCTNetMultiscale.ipynb)
+    │   ├── docs/        (rapport_ctfusion_multiscale.md)
+    │   └── results/     (figures confusion + courbes)
+    ├── uskip/           ← Contribution 3 V1 : MCTNetUSkip (skip connections légers)
+    │   └── notebooks/   (MCTNetUSkip.ipynb — à ajouter)
+    ├── unet/            ← Contribution 3 V2 : UNetMCTNetWithCovars (encodeur-décodeur + covariables)
+    │   └── notebooks/   (UNetMCTNetWithCovars.ipynb)
+    └── docs/            (idees_partie3.md — idées initiales)
 ```
 
 ---
@@ -49,71 +76,59 @@ pip install torch numpy pandas scikit-learn matplotlib
 Les fichiers de données ne sont pas versionnés dans ce repo (taille).
 Ils sont disponibles sur le Google Drive partagé de l'équipe.
 
-### Récupérer les données
-
-1. Télécharger le dossier `data/` depuis le Google Drive partagé
-2. Le placer à la racine du projet :
+Structure attendue après téléchargement :
 
 ```
-crop-classification/
-└── data/
-    └── preprocessed/
-        ├── scale30/           <- résolution 30m (version principale)
-        │   ├── Arkansas_train_input1.npy
-        │   ├── Arkansas_train_input2.npy
-        │   ├── Arkansas_train_labels.npy
-        │   ├── Arkansas_val_input1.npy
-        │   ├── Arkansas_val_input2.npy
-        │   ├── Arkansas_val_labels.npy
-        │   ├── Arkansas_test_input1.npy
-        │   ├── Arkansas_test_input2.npy
-        │   ├── Arkansas_test_labels.npy
-        │   ├── California_train_input1.npy
-        │   └── ... (même structure pour California)
-        └── scale20/           <- résolution 20m (comparaison)
-            └── ... (même structure)
-```
-
-### Régénérer les fichiers preprocessés (optionnel)
-
-Si tu veux relancer le preprocessing depuis les CSV bruts :
-
-```bash
-# Scale 30m
-jupyter notebook "Partie I/Point 4 — Data Preprocessing/preprocessing_30.ipynb"
-
-# Scale 20m
-jupyter notebook "Partie I/Point 4 — Data Preprocessing/preprocessing_MCTNet_N_10_36_20.ipynb"
+data/
+└── preprocessed/
+    ├── scale30/   (résolution 30m — version principale)
+    │   ├── Arkansas_{train,val,test}_{input1,input2,labels}.npy
+    │   └── California_{train,val,test}_{input1,input2,labels}.npy
+    └── scale20/   (résolution 20m — comparaison)
+        └── ...
 ```
 
 ---
 
-## Lancer les tests
+## Comment relancer chaque partie
+
+### Partie 1 — Reproduction MCTNet
+```bash
+cd "Partie I — Reproduction MCTNet/Point 5 — Model Implementation"
+python train.py --region Arkansas --data_dir ../../data/preprocessed/scale30
+python train.py --region California --data_dir ../../data/preprocessed/scale30
+```
+
+### Partie 2 — Covariables Environnementales
+Notebooks Jupyter, exécution sur Colab recommandée (GPU). Voir `Partie II — Covariables Environnementales/README.md`.
+
+### Partie 3 — Contributions
+Notebooks Jupyter, exécution sur Colab. Voir `Partie III — Contributions/README.md`.
+
+---
+
+## Compilation du rapport
 
 ```bash
-# Depuis le dossier Point 5
-cd "Partie I/Point 5 — Model Implementation"
-
-# Transformer + ALPE
-python -m tests.test_transformer
-
-# CNN (quand disponible)
-python -m tests.test_cnn
+cd rapport/
+pdflatex main.tex && biber main && pdflatex main.tex && pdflatex main.tex
 ```
+
+Le PDF compilé livré est aussi disponible dans `archive/PFE (1).pdf`.
 
 ---
 
 ## Workflow Git
 
-Voir [avancement.md](avancement.md) pour le détail complet.
+Le projet a été développé via des branches par membre :
 
 ```
-main          ← stable, remise prof
-└── dev       ← intégration validée
+main      ← stable
+└── dev   ← intégration
     ├── arslan/transformer
     ├── tesnime/cnn
-    └── sarah/preprocessing
+    ├── sarah/preprocessing  (sarah_code, sarah_data)
+    └── refactor/structure   ← branche actuelle (réorganisation finale)
 ```
 
-**Règle** : on ne push jamais directement sur `main` ou `dev`.
-Chaque modification passe par une Pull Request.
+Pour le détail de l'avancement par point, voir `avancement.md`.
