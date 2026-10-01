@@ -1,3 +1,6 @@
+> **Internal working notes, April 2026** (in French). Written during development and kept for history;
+> code, paths and results may differ from the final version. See the root [README](../../../README.md).
+
 # Documentation — Entraînement MCTNet
 ## `train.py`
 
@@ -42,7 +45,7 @@ train.py
 Charge les fichiers `.npy` produits par le preprocessing (Point 4 — Sarah).
 
 ```python
-dataset = CropDataset(data_dir='../../data/preprocessed', region='Arkansas', split='train')
+dataset = CropDataset(data_dir='../../data/preprocessed/scale30', region='Arkansas', split='train')
 # Retourne à chaque __getitem__ : (X, mask, y)
 # X    : (10, 36)  float32
 # mask : (36,)     float32
@@ -112,8 +115,8 @@ Le F1 macro est la métrique principale utilisée pour sauvegarder le meilleur m
 ### F1 macro comme critère de sauvegarde
 Le meilleur modèle est sauvegardé selon le **F1 macro** (pas l'OA). Raison : avec des classes déséquilibrées (Soybeans = 45% en Arkansas), l'OA peut être élevée même si les petites classes sont mal classées. Le F1 macro pénalise les mauvaises performances sur les petites classes.
 
-### Pas de learning rate scheduler
-L'article ne mentionne pas de scheduler. On utilise Adam avec `lr=0.001` fixe pendant 200 époques, conforme à la Table 3. Un scheduler cosine ou step pourrait améliorer les résultats — documenté dans `idees_partie3.md`.
+### Learning rate scheduler
+L'article ne mentionne pas de scheduler. Le code utilise Adam (`lr=0.001`, Table 3) avec `ReduceLROnPlateau` (facteur 0.5, patience 10 sur la loss val) et un early stopping (patience 20) — écart à l'article.
 
 ### CrossEntropyLoss sans class weights
 L'article n'utilise pas de class weights. La version pondérée est documentée dans `idees_partie3.md` comme piste d'amélioration pour les classes déséquilibrées.
@@ -122,7 +125,7 @@ L'article n'utilise pas de class weights. La version pondérée est documentée 
 `nn.CrossEntropyLoss` intègre LogSoftmax + NLLLoss — pas besoin de Softmax explicite dans `forward()`. En inférence, `predict()` appelle directement `argmax` sur les logits.
 
 ### Sauvegarde du meilleur modèle
-Seul le meilleur modèle (selon F1 val) est sauvegardé — `best_Arkansas.pth` ou `best_California.pth`. L'évaluation finale sur le test set utilise ce meilleur modèle, pas le dernier.
+Seul le meilleur modèle (selon F1 val) est sauvegardé — `best_{region}_{model}_seed{seed}.pth`. L'évaluation finale sur le test set utilise ce meilleur modèle, pas le dernier.
 
 ---
 
@@ -132,10 +135,10 @@ Seul le meilleur modèle (selon F1 val) est sauvegardé — `best_Arkansas.pth` 
 # Depuis le dossier "Point 5 — Model Implementation"
 
 # Arkansas
-python train.py --region Arkansas --data_dir ../../data/preprocessed
+python train.py --region Arkansas --data_dir ../../data/preprocessed/scale30
 
 # Californie
-python train.py --region California --data_dir ../../data/preprocessed
+python train.py --region California --data_dir ../../data/preprocessed/scale30
 ```
 
 ### Sortie attendue (fin d'entraînement)
@@ -144,14 +147,15 @@ python train.py --region California --data_dir ../../data/preprocessed
 ============================================================
 RESULTATS FINAUX — Arkansas
 ============================================================
-  OA    : 0.9680  (article : 0.968)
-  Kappa : 0.9510  (article : 0.951)
-  F1    : 0.9330  (article : 0.933)
+  OA    : 0.xxxx  (article, Table 5 : 0.968)
+  Kappa : 0.xxxx  (article, Table 5 : 0.951)
+  F1    : 0.xxxx  (article, Table 5 : 0.933)
 
-Modele sauvegarde : best_Arkansas.pth
+Modele sauvegarde : best_Arkansas_mctnet_seed42.pth
+Metriques ecrites : results/metrics_Arkansas_mctnet_seed42.json
 ```
 
 ### Prérequis
 
-Les fichiers `.npy` doivent être présents dans `data/preprocessed/` à la racine du projet.
+Les fichiers `.npy` doivent être présents dans `data/preprocessed/scale30/` à la racine du projet.
 Voir `README.md` pour les instructions de récupération depuis le Drive partagé.

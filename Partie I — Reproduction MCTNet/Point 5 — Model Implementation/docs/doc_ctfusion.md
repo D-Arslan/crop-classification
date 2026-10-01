@@ -1,3 +1,6 @@
+> **Internal working notes, April 2026** (in French). Written during development and kept for history;
+> code, paths and results may differ from the final version. See the root [README](../../../README.md).
+
 # Documentation — CTFusion block
 ## `src/ctfusion.py`
 
