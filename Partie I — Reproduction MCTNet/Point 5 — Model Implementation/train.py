@@ -5,26 +5,32 @@ Wang et al., 2024
 Usage :
     # depuis le dossier "Point 5 — Model Implementation"
 
-    python train.py --region Arkansas   --data_dir ../../data/preprocessed/partie1
-    python train.py --region California --data_dir ../../data/preprocessed/partie1
+    python train.py --region Arkansas   --seed 42
+    python train.py --region California --seed 42
 
-    # Partie 3 — GatedMCTNet
-    python train.py --region Arkansas   --data_dir ../../data/preprocessed/partie1 --model gated
-    python train.py --region California --data_dir ../../data/preprocessed/partie1 --model gated
+    # Partie 3 — GatedMCTNet (avant le 01/10/2026, gated était le défaut)
+    python train.py --region Arkansas   --model gated
 
 Sorties :
-    best_{region}_{model}.pth  — meilleur modèle selon F1 val
+    best_{region}_{model}_seed{seed}.pth            — meilleur modèle selon F1 val (non versionné)
+    results/metrics_{region}_{model}_seed{seed}.json — métriques test, historique, provenance
 """
 
 import argparse
+import datetime
+import hashlib
+import json
 import os
+import platform
+import random
+import subprocess
 import time
 
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-from sklearn.metrics import accuracy_score, cohen_kappa_score, f1_score
+from sklearn.metrics import accuracy_score, cohen_kappa_score, confusion_matrix, f1_score
 
 from src.mctnet import MCTNet, GatedMCTNet
 
@@ -115,7 +121,7 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
 # Évaluation — OA / Kappa / F1
 # ---------------------------------------------------------------------------
 
-def evaluate(model, loader, criterion, device):
+def evaluate(model, loader, criterion, device, return_preds=False):
     """
     Évalue le modèle sur un DataLoader.
 
@@ -124,6 +130,7 @@ def evaluate(model, loader, criterion, device):
         oa    : Overall Accuracy
         kappa : Cohen's Kappa
         f1    : F1 macro-averaged
+        (+ labels, preds si return_preds)
     """
     model.eval()
     total_loss = 0.0
@@ -149,20 +156,65 @@ def evaluate(model, loader, criterion, device):
     f1    = f1_score(all_labels, all_preds, average='macro', zero_division=0)
     loss  = total_loss / len(loader.dataset)
 
+    if return_preds:
+        return loss, oa, kappa, f1, all_labels, all_preds
     return loss, oa, kappa, f1
+
+
+# ---------------------------------------------------------------------------
+# Reproductibilité — seed + provenance (hash git, md5 des .npy)
+# ---------------------------------------------------------------------------
+
+def set_seed(seed: int):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+
+def git_commit():
+    """Hash du commit courant + indicateur d'arbre modifié (None hors dépôt git)."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    try:
+        sha = subprocess.check_output(
+            ['git', 'rev-parse', 'HEAD'], cwd=here, text=True).strip()
+        dirty = subprocess.check_output(
+            ['git', 'status', '--porcelain', '--', '.'], cwd=here, text=True).strip() != ''
+    except (OSError, subprocess.CalledProcessError):
+        return None, None
+    return sha, dirty
+
+
+def md5(path: str) -> str:
+    h = hashlib.md5()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(1 << 20), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def data_fingerprint(data_dir: str, region: str) -> dict:
+    """md5 de chaque fichier .npy lu par CropDataset."""
+    files = {}
+    for split in ('train', 'val', 'test'):
+        for kind in ('input1', 'input2', 'labels'):
+            name = f'{region}_{split}_{kind}.npy'
+            files[name] = md5(os.path.join(data_dir, name))
+    return files
 
 
 # ---------------------------------------------------------------------------
 # Main — boucle complète
 # ---------------------------------------------------------------------------
 
-def main(region: str, data_dir: str, model_name: str):
+def main(region: str, data_dir: str, model_name: str, seed: int, out_dir: str):
+    set_seed(seed)
     device    = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     n_classes = N_CLASSES[region]
-    save_path = f'best_{region}_{model_name}.pth'
+    save_path = f'best_{region}_{model_name}_seed{seed}.pth'
 
     print('=' * 60)
-    print(f'{model_name.upper()} -- {region}  ({n_classes} classes)')
+    print(f'{model_name.upper()} -- {region}  ({n_classes} classes)  seed={seed}')
     print(f'Device : {device}')
     print(f'Data dir : {data_dir}')
     print('=' * 60)
@@ -187,7 +239,8 @@ def main(region: str, data_dir: str, model_name: str):
         dropout=CONFIG['dropout'],
     ).to(device)
 
-    print(f'Parametres : {sum(p.numel() for p in model.parameters()):,}\n')
+    n_params = sum(p.numel() for p in model.parameters())
+    print(f'Parametres : {n_params:,}\n')
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(
@@ -201,11 +254,15 @@ def main(region: str, data_dir: str, model_name: str):
     best_f1        = 0.0
     best_epoch     = 0
     epochs_no_impr = 0
+    history        = []
     t0             = time.time()
 
     for epoch in range(1, CONFIG['epochs'] + 1):
         train_loss = train_one_epoch(model, train_loader, criterion, optimizer, device)
         val_loss, val_oa, val_kappa, val_f1 = evaluate(model, val_loader, criterion, device)
+        history.append({'epoch': epoch, 'train_loss': round(train_loss, 5),
+                        'val_loss': round(val_loss, 5), 'val_oa': round(val_oa, 5),
+                        'val_f1': round(val_f1, 5)})
 
         scheduler.step(val_loss)
 
@@ -236,15 +293,51 @@ def main(region: str, data_dir: str, model_name: str):
     # --- Évaluation finale sur le test set ---
     print(f'\nChargement meilleur modele (epoch {best_epoch}, val_F1={best_f1:.4f})...')
     model.load_state_dict(torch.load(save_path, map_location=device))
-    _, test_oa, test_kappa, test_f1 = evaluate(model, test_loader, criterion, device)
+    _, test_oa, test_kappa, test_f1, y_true, y_pred = evaluate(
+        model, test_loader, criterion, device, return_preds=True)
+    train_time = time.time() - t0
 
     print('\n' + '=' * 60)
-    print(f'RESULTATS FINAUX -- {region} [{model_name}]')
+    print(f'RESULTATS FINAUX -- {region} [{model_name}] seed={seed}')
     print('=' * 60)
     print(f'  OA    : {test_oa:.4f}')
     print(f'  Kappa : {test_kappa:.4f}')
     print(f'  F1    : {test_f1:.4f}')
     print(f'\nModele sauvegarde : {save_path}')
+
+    # --- Métriques versionnables ---
+    sha, dirty = git_commit()
+    metrics = {
+        'region': region,
+        'model': model_name,
+        'seed': seed,
+        'test': {'oa': test_oa, 'kappa': test_kappa, 'f1_macro': test_f1},
+        'best_epoch': best_epoch,
+        'best_val_f1': best_f1,
+        'epochs_run': len(history),
+        'train_time_s': round(train_time, 1),
+        'n_params': n_params,
+        'n_samples': {'train': len(train_set), 'val': len(val_set), 'test': len(test_set)},
+        'confusion_matrix_test': confusion_matrix(
+            y_true, y_pred, labels=list(range(n_classes))).tolist(),
+        'config': CONFIG,
+        'provenance': {
+            'git_commit': sha,
+            'git_dirty': dirty,
+            'data_dir': data_dir,
+            'data_md5': data_fingerprint(data_dir, region),
+            'python': platform.python_version(),
+            'torch': torch.__version__,
+            'device': str(device),
+            'date_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'),
+        },
+        'history': history,
+    }
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, f'metrics_{region}_{model_name}_seed{seed}.json')
+    with open(out_path, 'w', encoding='utf-8') as f:
+        json.dump(metrics, f, indent=2)
+    print(f'Metriques ecrites : {out_path}')
 
 
 # ---------------------------------------------------------------------------
@@ -260,13 +353,15 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--data_dir',
-        default='../../data/preprocessed/partie1',
+        default='../../data/preprocessed/scale30',
     )
     parser.add_argument(
         '--model',
         choices=['mctnet', 'gated'],
-        default='gated',
+        default='mctnet',
         help='mctnet = MCTNet original | gated = GatedMCTNet (Partie 3)',
     )
+    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--out_dir', default='results')
     args = parser.parse_args()
-    main(args.region, args.data_dir, args.model)
+    main(args.region, args.data_dir, args.model, args.seed, args.out_dir)
