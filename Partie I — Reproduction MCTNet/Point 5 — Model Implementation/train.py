@@ -173,13 +173,13 @@ def set_seed(seed: int):
 
 
 def git_commit():
-    """Hash du commit courant + indicateur d'arbre modifié (None hors dépôt git)."""
+    """Hash du commit courant + indicateur d'arbre modifié, hors results/ (None hors dépôt git)."""
     here = os.path.dirname(os.path.abspath(__file__))
     try:
         sha = subprocess.check_output(
             ['git', 'rev-parse', 'HEAD'], cwd=here, text=True).strip()
         dirty = subprocess.check_output(
-            ['git', 'status', '--porcelain', '--', '.'], cwd=here, text=True).strip() != ''
+            ['git', 'status', '--porcelain', '--', '.', ':!results'], cwd=here, text=True).strip() != ''
     except (OSError, subprocess.CalledProcessError):
         return None, None
     return sha, dirty
