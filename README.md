@@ -5,6 +5,8 @@ crop mapping from Sentinel-2 time series (Arkansas, California), followed by an 
 covariate ablation and three architectural variants. The baseline is **re-run from this
 repository, 3 seeds × 2 regions, every number traced to a versioned `metrics.json`**.
 
+[![ci](https://github.com/D-Arslan/crop-classification/actions/workflows/ci.yml/badge.svg)](https://github.com/D-Arslan/crop-classification/actions/workflows/ci.yml)
+
 M1 project, USTHB (Algiers), April to May 2026, delivered with a LaTeX report (`rapport/`).
 Team: Arslan Dif, Tesnime Ziane Berroudja, Sarah Acherouf Kebir.
 
@@ -125,7 +127,7 @@ CTFusion stage halves the time axis and doubles the channels: (10, 36) → (20, 
 | data | Google Earth Engine (JavaScript), Sentinel-2 SR harmonized, USDA CDL 2021, ESA WorldCover; ERA5, OpenLandMap, SRTM for Part II |
 | model and training | Python 3.12, PyTorch 2.10 (CPU locally; CUDA on Colab for the notebooks), scikit-learn metrics |
 | experiments | Jupyter on Google Colab (Parts II and III) |
-| quality | pytest, 21 offline tests on the model (stage shapes, ALPE mask, parameter counts, gate values) |
+| quality | pytest, 21 offline tests on the model (stage shapes, ALPE mask, exact parameter counts, gate values), GitHub Actions on Ubuntu and Windows |
 | report | LaTeX (`rapport/`), compiled PDF `rapport/rapport_final.pdf` |
 
 ## Getting started in 3 commands
@@ -202,7 +204,8 @@ Details: [docs/DESIGN.md](docs/DESIGN.md).
 - **Small balanced samples**, one year (2021), our own zones: no claim transfers to
   wall-to-wall mapping.
 - **Notebooks are tied to Colab and Drive paths**, and two Multiscale scripts are missing.
-- **No CI yet.** The 21 tests are fast and offline; a workflow is the next step.
+- **CI covers the model only.** No test touches the data pipeline or `train.py` (it needs
+  the `.npy` files); the notebooks are not tested.
 
 ## Author
 

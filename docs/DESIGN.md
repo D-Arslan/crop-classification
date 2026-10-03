@@ -146,10 +146,12 @@ settle it: run `train.py` (no covariates) on the Part II `.npy`, three seeds.
   mapping accuracy (the paper itself shows that mapping accuracy can differ from test
   accuracy).
 - Notebooks hard-code the team's Drive paths and require Colab.
-- No CI. The 21 tests run offline in a few seconds. Only one test pins the GatedMCTNet
-  overhead exactly (+4,270). The MCTNet count is checked within ±10,000 of the paper's 55,059:
-  that rejects the 4×C variant (39,718), but accepts any model between 45,060 and 65,058.
-  The CTFusion and Transformer "parameter" tests only print a count and assert nothing.
+- Tests cover the model only (21 cases, offline, a few seconds, CI on Ubuntu and Windows).
+  Parameter counts are pinned: exact per stage for CTFusion and the Transformer, exact for
+  the GatedMCTNet overhead (+4,270), ±1% around 56,798 / 56,879 for MCTNet. A 4×C FFN fails
+  three of them. Until 2026-10-03, the MCTNet check was ±10,000 around the paper's 55,059,
+  and the CTFusion and Transformer checks asserted nothing. Nothing tests the data pipeline
+  or `train.py`.
 
 ## 6. Reproducing the figures
 
