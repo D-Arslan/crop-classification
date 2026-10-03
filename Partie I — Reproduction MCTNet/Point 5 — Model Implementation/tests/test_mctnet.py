@@ -76,11 +76,13 @@ def test_nombre_parametres():
     total_cal = sum(p.numel() for p in model_cal.parameters())
     print(f"[OK] Parametres Arkansas   : {total_ark:,}  (article Table 6 : 55 059)")
     print(f"[OK] Parametres Californie : {total_cal:,}")
-    # Alerte si on s'éloigne trop de la cible article
-    assert abs(total_ark - 55059) < 10000, (
-        f"Trop loin de la cible article (55 059) : {total_ark:,} params. "
-        f"Verifier l'architecture."
-    )
+    # ±1 % autour de nos totaux (FFN 8×C) : rejette 4×C (39 718) et toute dérive d'architecture
+    for total, attendu in ((total_ark, 56798), (total_cal, 56879)):
+        assert abs(total - attendu) <= 0.01 * attendu, (
+            f"{total:,} params, attendu {attendu:,} ±1 %. Verifier l'architecture."
+        )
+    # Seule la couche de sortie dépend du nombre de classes : Linear(80 → n_classes)
+    assert total_cal - total_ark == 80 + 1
 
 
 if __name__ == "__main__":

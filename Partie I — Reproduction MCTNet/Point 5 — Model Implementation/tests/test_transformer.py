@@ -43,10 +43,12 @@ def test_nombre_parametres():
     s1 = TransformerSubModule(channels=10, seq_len=36, n_head=5, use_alpe=True)
     s2 = TransformerSubModule(channels=20, seq_len=18, n_head=5, use_alpe=False)
     s3 = TransformerSubModule(channels=40, seq_len=9,  n_head=5, use_alpe=False)
-    total = (sum(p.numel() for p in s1.parameters())
-           + sum(p.numel() for p in s2.parameters())
-           + sum(p.numel() for p in s3.parameters()))
+    counts = [sum(p.numel() for p in s.parameters()) for s in (s1, s2, s3)]
+    total = sum(counts)
     print(f"[OK] Nombre total de paramètres (3 Transformers) : {total:,}")
+    # FFN 8×C ; avec 4×C le total tomberait bien en dessous
+    assert counts == [2493, 8340, 32680], counts
+    assert total == 43513
 
 
 def test_masque_requis_si_alpe():

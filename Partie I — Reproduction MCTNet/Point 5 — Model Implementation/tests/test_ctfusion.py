@@ -66,10 +66,12 @@ def test_nombre_parametres():
     stage1 = CTFusion(in_channels=10, seq_len=36, n_head=5, use_alpe=True)
     stage2 = CTFusion(in_channels=20, seq_len=18, n_head=5, use_alpe=False)
     stage3 = CTFusion(in_channels=40, seq_len=9,  n_head=5, use_alpe=False)
-    total = (sum(p.numel() for p in stage1.parameters())
-           + sum(p.numel() for p in stage2.parameters())
-           + sum(p.numel() for p in stage3.parameters()))
+    counts = [sum(p.numel() for p in s.parameters()) for s in (stage1, stage2, stage3)]
+    total = sum(counts)
     print(f"[OK] Nombre total de paramètres (3 CTFusion) : {total:,}")
+    # 56 393 + classifieur Linear(80 → 5) (405) = 56 798 params MCTNet Arkansas
+    assert counts == [3133, 10820, 42440], counts
+    assert total == 56393
 
 
 if __name__ == "__main__":
